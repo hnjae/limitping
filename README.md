@@ -48,7 +48,7 @@ codex   ✓ pinged (13.6s)
   by hand, and `auto_redeem = true` lets `watch` / `continue` spend one on its
   own once it is close to expiring — a banked reset is worth nothing after it
   expires. Off by default, because redeeming is irreversible.
-- Types short: every command also works as `lp` (e.g. `lp s`, `lp w`).
+- Types short: every command also works as `lmp` (e.g. `lmp s`, `lmp w`).
 - Includes dry-run modes, weekly-limit guards, reset buffers, cheap-model
   defaults, macOS notifications, local config, and no telemetry.
 
@@ -209,11 +209,15 @@ Short aliases are also available for config commands: `limitping c i` for
 
 ### Command aliases
 
-`limitping --help` lists aliases inline, for example `ping, p`.
+`limitping --help` lists aliases inline, for example `ping, p`, and its own
+`Aliases:` line shows both binary names so either one is discoverable from the
+other.
 
-The binary itself has a short name too: the installer symlinks `lp` next to
-`limitping`, so `lp status`, `lp w`, and `limitping status` are the same
-command. (Building from source? `ln -s limitping /usr/local/bin/lp`.)
+The binary itself has a short name too: the installer symlinks `lmp` next to
+`limitping`, so `lmp status`, `lmp w`, and `limitping status` are the same
+command. The installer skips the link if `lmp` already exists or resolves to
+another command on your PATH — a symlink in `/usr/local/bin` shadows anything
+it collides with. (Building from source? `ln -s limitping /usr/local/bin/lmp`.)
 
 | Command | Aliases |
 | --- | --- |

@@ -37,11 +37,14 @@ through GitHub Actions and GoReleaser.
   `codex -m` is not checked locally, so a retired model used to surface only as
   an opaque server error at window rollover; it is now rejected up front with
   the list of models the plan actually offers.
-- Every command now also answers to `lp`: the installer symlinks it next to
+- Every command now also answers to `lmp`: the installer symlinks it next to
   `limitping`, usage lines and help examples echo back whichever name was typed,
-  and `uninstall` removes the link. Install and uninstall both check ownership
-  first, so an unrelated `lp` on your PATH is never replaced or deleted.
-  `redeem` also picked up the short alias `r`.
+  and `uninstall` removes the link. The name deliberately avoids `lp`, which is
+  CUPS's printing command on macOS and most Linux distributions — a symlink in
+  a directory that precedes `/usr/bin` would have shadowed it. Install skips the
+  link if the name is taken at that path or already resolves to another command
+  on PATH, and uninstall removes only a link that points at the binary it is
+  removing. `redeem` also picked up the short alias `r`.
 - `watch --help` and `continue --help` now document `auto_redeem`, and the
   README highlights cover `redeem`, so spending a reset credit before it lapses
   is discoverable from the commands it affects instead of only from the config.

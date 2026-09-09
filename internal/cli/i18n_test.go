@@ -180,8 +180,8 @@ func setLocale(t *testing.T, locale string) {
 
 func TestInvokedNameRecognizesOnlyTheAlias(t *testing.T) {
 	cases := map[string]string{
-		"/usr/local/bin/lp":        BinaryAlias,
-		"lp.exe":                   BinaryAlias,
+		"/usr/local/bin/lmp":       BinaryAlias,
+		"lmp.exe":                  BinaryAlias,
 		"/usr/local/bin/limitping": "limitping",
 		"/tmp/go-build/cli.test":   "limitping",
 	}
@@ -260,5 +260,35 @@ func TestWatchAndContinueHelpDocumentAutoRedeem(t *testing.T) {
 		if !strings.Contains(text.watchLong, "redeem") || !strings.Contains(text.continueLong, "redeem") {
 			t.Error("watch/continue help does not point at the redeem command")
 		}
+	}
+}
+
+// Whichever name was typed, the root help must advertise the other one, so a
+// user who only ever runs `limitping` still discovers `lmp` and vice versa.
+func TestRootHelpAdvertisesBothBinaryNames(t *testing.T) {
+	for _, argv0 := range []string{"/usr/local/bin/" + BinaryAlias, "/usr/local/bin/limitping"} {
+		t.Run(argv0, func(t *testing.T) {
+			setLocale(t, "C")
+			old := os.Args
+			os.Args = []string{argv0}
+			defer func() { os.Args = old }()
+
+			root := newRootCmd()
+			var out bytes.Buffer
+			root.SetOut(&out)
+			root.SetArgs([]string{"--help"})
+			if err := root.Execute(); err != nil {
+				t.Fatalf("help: %v", err)
+			}
+			got := out.String()
+			for _, want := range []string{BinaryAlias, "limitping"} {
+				if !strings.Contains(got, want) {
+					t.Fatalf("help output does not mention %q:\n%s", want, got)
+				}
+			}
+			if !strings.Contains(got, "Aliases:") {
+				t.Fatalf("help output has no Aliases section:\n%s", got)
+			}
+		})
 	}
 }

@@ -35,7 +35,7 @@ func runUninstall(out, errOut io.Writer, keepConfig bool) error {
 	if err != nil {
 		return fmt.Errorf("locating current executable: %w", err)
 	}
-	// Invoked through the `lp` alias, os.Executable can be the symlink itself;
+	// Invoked through the `lmp` alias, os.Executable can be the symlink itself;
 	// removing that would leave the real binary installed.
 	exe = resolveLinks(exe)
 
@@ -72,7 +72,7 @@ func runUninstall(out, errOut io.Writer, keepConfig bool) error {
 	return nil
 }
 
-// removeAlias deletes the `lp` symlink installed next to exe. It only removes
+// removeAlias deletes the `lmp` symlink installed next to exe. It only removes
 // a link that actually points at exe, so it can never take out an unrelated
 // binary that happens to share the name.
 func removeAlias(exe string, out io.Writer) error {

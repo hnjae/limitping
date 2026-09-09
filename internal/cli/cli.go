@@ -19,10 +19,13 @@ import (
 // Version is the binary version, overridable at build time via -ldflags.
 var Version = "0.9.0"
 
-// BinaryAlias is the short name installed alongside the binary, so `lp` is
+// BinaryAlias is the short name installed alongside the binary, so `lmp` is
 // interchangeable with `limitping`. install.sh creates it as a symlink and
-// `uninstall` removes it.
-const BinaryAlias = "lp"
+// `uninstall` removes it. It deliberately avoids the `lp*` namespace, which
+// belongs to CUPS: `lp`, `lpq`, `lpr`, `lprm`, `lpstat` and friends ship on
+// macOS and most Linux distributions, and installing into a directory that
+// precedes /usr/bin on PATH would shadow the system printing commands.
+const BinaryAlias = "lmp"
 
 // invokedName is the name limitping was called as, so usage lines echo back the
 // command the user actually typed. Only the alias is recognized: any other name
@@ -34,6 +37,15 @@ func invokedName() string {
 	return "limitping"
 }
 
+// alternateName is the name limitping was not invoked as, advertised in the
+// root help so both remain discoverable from either one.
+func alternateName() string {
+	if invokedName() == BinaryAlias {
+		return "limitping"
+	}
+	return BinaryAlias
+}
+
 // Execute runs the root command.
 func Execute() error {
 	return newRootCmd().Execute()
@@ -42,7 +54,12 @@ func Execute() error {
 func newRootCmd() *cobra.Command {
 	text := localizedText()
 	root := &cobra.Command{
-		Use:           invokedName(),
+		Use: invokedName(),
+		// Purely informational — the root has no parent to resolve an alias
+		// through. It makes `--help` render "Aliases: lmp, limitping" through
+		// the same section that already advertises per-command aliases, so
+		// whichever name you typed, the other one is discoverable.
+		Aliases:       []string{alternateName()},
 		Short:         text.rootShort,
 		Long:          text.rootLong,
 		SilenceUsage:  true,

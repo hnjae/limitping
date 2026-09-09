@@ -35,7 +35,7 @@ func TestRemoveAliasOnlyRemovesOurOwnLink(t *testing.T) {
 	t.Run("keeps an unrelated binary of the same name", func(t *testing.T) {
 		dir, exe := newInstall(t)
 		alias := filepath.Join(dir, BinaryAlias)
-		if err := os.WriteFile(alias, []byte("someone else's lp"), 0o755); err != nil {
+		if err := os.WriteFile(alias, []byte("someone else's lmp"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		if err := removeAlias(exe, io.Discard); err != nil {
