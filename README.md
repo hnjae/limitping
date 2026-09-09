@@ -563,12 +563,23 @@ Providers are isolated in `internal/provider` behind a small `Provider`
 interface (`ReadUsage` + `Trigger`), so adding a new provider is mostly
 self-contained provider code plus wiring in `internal/cli` and `internal/config`.
 
-**Releasing** is automated: push a tag and GitHub Actions runs GoReleaser to
-build the cross-platform binaries and publish a Release.
+**Releasing** is one command — push a tag, and GitHub Actions runs GoReleaser to
+build the cross-platform binaries and publish a Release:
 
 ```sh
-git tag v0.2.0 && git push origin v0.2.0
+git tag v0.10.0 && git push origin v0.10.0
 ```
+
+Nothing else needs editing. The tag is the only place a version is written down:
+the release build stamps it in via `-ldflags`, and any other build derives its
+version from the module's build info, so there is no constant to bump and
+nothing that can drift from the tag. A local `go build` reports
+`dev+<revision>` and never offers to upgrade itself.
+
+Release notes are generated from the commit log, so **commit subjects are the
+release notes** — write them as a line a user would want to read. There is no
+hand-maintained changelog to keep in sync; published notes live on the
+[Releases](https://github.com/wavever/CCLimitPing/releases) page.
 
 ## License
 

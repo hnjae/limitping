@@ -510,12 +510,20 @@ Provider 都隔离在 `internal/provider`,只需实现一个很小的 `Provider`
 `Trigger`),所以新增一个 Provider 基本是自包含的 Provider 代码,加上在 `internal/cli`
 和 `internal/config` 里接一下线。
 
-**发版**是自动的:打一个 tag 并推送,GitHub Actions 会跑 GoReleaser 交叉编译各平台
-二进制并发布 Release。
+**发版**只有一条命令 —— 打 tag 并推送,GitHub Actions 会跑 GoReleaser 交叉编译各平台
+二进制并发布 Release:
 
 ```sh
-git tag v0.2.0 && git push origin v0.2.0
+git tag v0.10.0 && git push origin v0.10.0
 ```
+
+不需要改任何其他文件。tag 是版本号唯一被写下来的地方:发布构建通过 `-ldflags` 注入,
+其他构建从模块自身的 build info 推导,所以没有常量需要手动 bump,也就不可能和 tag 不一致。
+本地 `go build` 出来的版本是 `dev+<revision>`,不会提示自我升级。
+
+Release notes 由 commit 日志生成,所以**提交标题就是 release notes** —— 请按"用户愿意读
+的一行字"来写。仓库里不再维护手写 changelog,已发布的说明见
+[Releases](https://github.com/wavever/CCLimitPing/releases) 页面。
 
 ## 许可证
 
