@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -175,4 +176,43 @@ func TestEnsureAliasCreatesAndKeepsOwnership(t *testing.T) {
 			t.Fatalf("shadowing was not reported: %q", out.String())
 		}
 	})
+}
+
+// The alias repair hangs off `version` because that is the only entry point an
+// older `upgrade` gives a new build: every released runUpgrade ends by running
+// `<new binary> version`. Break this wiring and upgrading from a version that
+// predates the alias silently produces a binary that advertises `lmp` without
+// installing one — which is exactly what shipped in v1.0.0. Built and run as a
+// subprocess because the repair keys off os.Executable.
+func TestVersionCommandRepairsTheAliasForOlderUpgraders(t *testing.T) {
+	if testing.Short() {
+		t.Skip("builds a binary")
+	}
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "limitping")
+
+	build := exec.Command("go", "build", "-o", exe, "github.com/wavever/CCLimitPing/cmd/limitping")
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build: %v\n%s", err, out)
+	}
+
+	// PATH holds only dir, so the alias lookup cannot see a real lmp installed
+	// on the machine running the tests.
+	run := exec.Command(exe, "version")
+	run.Env = append(os.Environ(), "PATH="+dir)
+	out, err := run.CombinedOutput()
+	if err != nil {
+		t.Fatalf("version: %v\n%s", err, out)
+	}
+
+	target, err := os.Readlink(filepath.Join(dir, BinaryAlias))
+	if err != nil {
+		t.Fatalf("`version` did not install the alias: %v\noutput: %s", err, out)
+	}
+	if target != "limitping" {
+		t.Fatalf("alias points at %q, want limitping", target)
+	}
+	if !strings.HasPrefix(string(out), "limitping ") {
+		t.Fatalf("version output no longer starts with the version line: %q", out)
+	}
 }

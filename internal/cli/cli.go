@@ -283,6 +283,19 @@ func newVersionCmd() *cobra.Command {
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
 			fmt.Fprintf(cmd.OutOrStdout(), "limitping %s\n", version())
+
+			// An upgrade is driven by the binary being replaced, so a version
+			// that predates the alias installs a binary whose --help advertises
+			// `lmp` without ever creating one — and the user has no way to know
+			// a second `upgrade` would fix it. Every released `upgrade` ends by
+			// running `<new binary> version`, which makes this the one place a
+			// new build gets to act on its own behalf after an old one upgraded
+			// it. Cheap (a readlink), idempotent, and bound by the same
+			// ownership rules as install.sh. It reports on stderr so `version`
+			// stdout stays exactly one parseable line.
+			if exe, err := currentExecutable(); err == nil {
+				ensureAlias(exe, cmd.ErrOrStderr())
+			}
 		},
 	}
 }
