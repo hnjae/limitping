@@ -100,6 +100,44 @@ func removeAlias(exe string, out io.Writer) error {
 	return nil
 }
 
+// ensureAlias puts the short alias next to exe, pointing at it. `upgrade`
+// replaces the binary in place and used to leave the alias entirely to
+// install.sh, so upgrading into a version that advertises `lmp` in --help still
+// left the user without the command.
+//
+// It applies the same two rules install.sh does. The path must be free or
+// already our own link, and the name must not already resolve to another
+// command on PATH — the alias lands in a directory that normally precedes
+// /usr/bin, so claiming a taken name would shadow it. Every refusal is silent
+// except a genuine collision, and none of them fail the upgrade: the binary is
+// already in place by then.
+func ensureAlias(exe string, out io.Writer) {
+	alias := filepath.Join(filepath.Dir(exe), BinaryAlias)
+
+	switch target, err := os.Readlink(alias); {
+	case err == nil:
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(filepath.Dir(alias), target)
+		}
+		if resolveLinks(target) != resolveLinks(exe) {
+			fmt.Fprintf(out, "NOTE: %s points elsewhere; leaving it alone.\n", alias)
+		}
+		return // ours already, or someone else's to keep
+	case !errors.Is(err, os.ErrNotExist):
+		fmt.Fprintf(out, "NOTE: %s already exists and is not our symlink; skipped the short alias.\n", alias)
+		return
+	}
+
+	if existing, err := exec.LookPath(BinaryAlias); err == nil && resolveLinks(existing) != resolveLinks(exe) {
+		fmt.Fprintf(out, "NOTE: %q already runs %s; skipped the short alias.\n", BinaryAlias, existing)
+		return
+	}
+	if err := os.Symlink(filepath.Base(exe), alias); err != nil {
+		return // best effort; the upgrade itself succeeded
+	}
+	fmt.Fprintf(out, "Installed %s -> %s\n", BinaryAlias, exe)
+}
+
 // resolveLinks returns path with symlinks resolved, or path unchanged when it
 // cannot be resolved (e.g. it no longer exists).
 func resolveLinks(path string) string {
