@@ -116,6 +116,22 @@ curl -fsSL https://raw.githubusercontent.com/wavever/CCLimitPing/main/install.sh
 limitping upgrade
 ```
 
+`upgrade` 会先检查,已是最新就直接告诉你;`--force` 可强制重装。`status`、`ping`、
+`bg status` 和 `continue` 也会在自己的输出之前提示新版本,每个版本只提示到你处理为止:
+
+```
+✨ 有新版本!  0.9.0 -> 0.10.0
+   更新说明: https://github.com/wavever/CCLimitPing/releases/latest
+
+   1. 立即更新 (执行 `limitping upgrade`)
+   2. 跳过
+   3. 跳过此版本
+```
+
+选 3 会把该版本记进 `~/.config/limitping/version.json`,直到下一个版本才再提醒。检查
+每天最多一次、最长阻塞 2 秒,并且在非交互终端下完全跳过 —— 所以 `--json`、`hook` 回调
+和后台守护进程都不会被打扰。
+
 简称/别名:`limitping up`、`limitping update`。
 
 **卸载** —— 删除已安装的二进制以及配置/缓存:

@@ -135,6 +135,24 @@ Downloads the right prebuilt binary from the
 limitping upgrade
 ```
 
+`upgrade` checks first and says so if you are already current; `--force`
+reinstalls anyway. `status`, `ping`, `bg status` and `continue` also announce a
+new release before their own output, once per release:
+
+```
+✨ Update available!  0.9.0 -> 0.10.0
+   Release notes: https://github.com/wavever/CCLimitPing/releases/latest
+
+   1. Update now (runs `limitping upgrade`)
+   2. Skip
+   3. Skip until next version
+```
+
+Option 3 records the release in `~/.config/limitping/version.json` and stays
+quiet until the next one. The check runs at most once a day, never blocks for
+more than two seconds, and is skipped entirely without an interactive terminal
+— so `--json`, the `hook` callback and background watchers stay silent.
+
 Aliases: `limitping up`, `limitping update`.
 
 **Uninstall** — remove the installed binary plus config/cache:

@@ -151,8 +151,19 @@ type cliText struct {
 	hooksNothingFmt     string
 	hooksTrustCodex     string
 
-	upgradeShort string
-	upgradeLong  string
+	updateAvailableFmt      string // current, next
+	updateNotesFmt          string // release notes URL
+	updateOptionUpgrade     string // the upgrade command to run
+	updateOptionSkip        string
+	updateOptionSkipVersion string
+	updateChoosePrompt      string
+	updateDismissedFmt      string // version
+	updateFailedFmt         string // error
+
+	upgradeShort      string
+	upgradeCurrentFmt string // current version
+	upgradeForceFlag  string
+	upgradeLong       string
 
 	uninstallShort      string
 	uninstallLong       string
@@ -441,8 +452,18 @@ Examples:
 	hooksNothingFmt:   "No %s hooks found in %s\n",
 	hooksTrustCodex:   "\nCodex requires a one-time trust: run /hooks inside Codex to enable the new hooks.\n(Claude Code loads its hooks automatically — nothing to do there.)\n",
 
-	upgradeShort: "Upgrade limitping to the latest release",
-	upgradeLong:  "Download the latest GitHub release for this OS/architecture and replace the currently running limitping binary.",
+	updateAvailableFmt:      "\n\u2728 Update available!  %s -> %s\n",
+	updateNotesFmt:          "   Release notes: %s\n\n",
+	updateOptionUpgrade:     "   1. Update now (runs `%s`)\n",
+	updateOptionSkip:        "   2. Skip\n",
+	updateOptionSkipVersion: "   3. Skip until next version\n",
+	updateChoosePrompt:      "\n   Choose [1-3, default 2]: ",
+	updateDismissedFmt:      "   Skipping %s; you'll hear about the next release.\n",
+	updateFailedFmt:         "   %v\n",
+	upgradeShort:            "Upgrade limitping to the latest release",
+	upgradeCurrentFmt:       "limitping %s is already the latest release.\n",
+	upgradeForceFlag:        "reinstall even when already on the latest release",
+	upgradeLong:             "Download the latest GitHub release for this OS/architecture and replace the currently running limitping binary.",
 
 	uninstallShort:      "Remove limitping and its config/cache",
 	uninstallLong:       "Remove the currently running limitping binary and its config/cache directory. Pass --keep-config to preserve config/cache files.",
@@ -706,8 +727,18 @@ Claude Code 会自动加载钩子；Codex 需要一次性信任：在 Codex 中�
 	hooksNothingFmt:   "%s 中未找到钩子: %s\n",
 	hooksTrustCodex:   "\nCodex 需要一次性信任：在 Codex 中运行 /hooks 启用新钩子。\n（Claude Code 会自动加载，无需操作。）\n",
 
-	upgradeShort: "将 limitping 更新到最新版本",
-	upgradeLong:  "下载适用于当前系统和架构的最新 GitHub Release，并替换正在运行的 limitping 二进制文件。",
+	updateAvailableFmt:      "\n\u2728 有新版本!  %s -> %s\n",
+	updateNotesFmt:          "   更新说明: %s\n\n",
+	updateOptionUpgrade:     "   1. 立即更新 (执行 `%s`)\n",
+	updateOptionSkip:        "   2. 跳过\n",
+	updateOptionSkipVersion: "   3. 跳过此版本\n",
+	updateChoosePrompt:      "\n   请选择 [1-3, 默认 2]: ",
+	updateDismissedFmt:      "   已跳过 %s，下个版本会再提醒。\n",
+	updateFailedFmt:         "   %v\n",
+	upgradeShort:            "将 limitping 更新到最新版本",
+	upgradeCurrentFmt:       "limitping %s 已是最新版本。\n",
+	upgradeForceFlag:        "即使已是最新版本也强制重装",
+	upgradeLong:             "下载适用于当前系统和架构的最新 GitHub Release，并替换正在运行的 limitping 二进制文件。",
 
 	uninstallShort:      "删除 limitping 及其配置/缓存",
 	uninstallLong:       "删除当前运行的 limitping 二进制文件及配置/缓存目录。使用 --keep-config 可保留配置/缓存文件。",

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -27,6 +28,9 @@ func newStatusCmd() *cobra.Command {
 		Long:    text.statusLong,
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !jsonOut {
+				updateNotice(cmd.Context(), cmd.OutOrStdout(), text, os.Stdin)
+			}
 			cfg, err := config.Load()
 			if err != nil {
 				return err

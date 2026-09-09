@@ -16,13 +16,16 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/wavever/CCLimitPing/internal/update"
 )
 
 const releaseDownloadBase = "https://github.com/wavever/CCLimitPing/releases/latest/download"
 
 func newUpgradeCmd() *cobra.Command {
+	var force bool
 	text := localizedText()
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:     "upgrade",
 		Aliases: []string{"up", "update"},
 		Short:   text.upgradeShort,
@@ -31,9 +34,21 @@ func newUpgradeCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Minute)
 			defer cancel()
-			return runUpgrade(ctx, cmd.OutOrStdout(), cmd.ErrOrStderr())
+			out := cmd.OutOrStdout()
+			// Say so instead of re-downloading and reinstalling the same build.
+			// A failed or empty lookup falls through and upgrades anyway, which
+			// is the behaviour this command has always had.
+			if latest := update.Latest(ctx, updateHTTPClient); latest != "" && !force && isReleaseVersion() {
+				if update.Available(version(), latest, "") == "" {
+					fmt.Fprintf(out, text.upgradeCurrentFmt, update.Normalize(version()))
+					return nil
+				}
+			}
+			return runUpgrade(ctx, out, cmd.ErrOrStderr())
 		},
 	}
+	cmd.Flags().BoolVar(&force, "force", false, text.upgradeForceFlag)
+	return cmd
 }
 
 func runUpgrade(ctx context.Context, out, errOut io.Writer) error {
