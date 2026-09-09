@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -16,8 +17,82 @@ import (
 	"github.com/wavever/CCLimitPing/internal/scheduler"
 )
 
-// Version is the binary version, overridable at build time via -ldflags.
-var Version = "0.9.0"
+// Version is set at build time via -ldflags by the release pipeline. Leaving it
+// empty everywhere else is deliberate: version() then derives the value from
+// the module's own build info, so the tag is the single source of truth and
+// there is no second copy to forget to bump. DevVersion marks a build that came
+// from neither, which is any local `go build`.
+var Version = ""
+
+// DevVersion is reported for a build with no release identity. It is not a
+// version number on purpose, so it can never compare as newer or older than a
+// real release.
+const DevVersion = "dev"
+
+// version resolves the running binary's version for display: the release
+// ldflag, else the module version recorded by `go install pkg@version`, else
+// DevVersion tagged with the revision it was built from.
+func version() string {
+	if Version != "" {
+		return strings.TrimPrefix(Version, "v")
+	}
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return DevVersion
+	}
+	if v := releaseVersion(bi.Main.Version); v != "" {
+		return v
+	}
+	if rev := vcsRevision(bi); rev != "" {
+		return DevVersion + "+" + rev
+	}
+	return DevVersion
+}
+
+// isReleaseVersion reports whether the binary knows which published release it
+// is. A local build does not, so it must not be compared against the newest
+// release — there is nothing meaningful to say about whether it is out of date.
+func isReleaseVersion() bool { return releaseVersion(version()) != "" }
+
+var releaseVersionRE = regexp.MustCompile(`^\d+(\.\d+)*$`)
+
+// releaseVersion returns v without its leading "v" when it names a published
+// release — bare numeric components and nothing else. A `go build` in a work
+// tree reports a pseudo-version instead (0.9.1-0.20260909072312-7599547+dirty),
+// which names no release, and neither does a pre-release or snapshot ldflag.
+func releaseVersion(v string) string {
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	if !releaseVersionRE.MatchString(v) {
+		return ""
+	}
+	return v
+}
+
+// vcsRevision is the short commit a local build came from, plus a dirty marker
+// when the work tree had uncommitted changes. Empty when Go recorded no VCS
+// information (building outside a repository, or with -buildvcs=false).
+func vcsRevision(bi *debug.BuildInfo) string {
+	var rev string
+	var dirty bool
+	for _, s := range bi.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			rev = s.Value
+		case "vcs.modified":
+			dirty = s.Value == "true"
+		}
+	}
+	if rev == "" {
+		return ""
+	}
+	if len(rev) > 7 {
+		rev = rev[:7]
+	}
+	if dirty {
+		rev += "-dirty"
+	}
+	return rev
+}
 
 // BinaryAlias is the short name installed alongside the binary, so `lmp` is
 // interchangeable with `limitping`. install.sh creates it as a symlink and
@@ -207,7 +282,7 @@ func newVersionCmd() *cobra.Command {
 		Short:   text.versionShort,
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
-			fmt.Fprintf(cmd.OutOrStdout(), "limitping %s\n", Version)
+			fmt.Fprintf(cmd.OutOrStdout(), "limitping %s\n", version())
 		},
 	}
 }
