@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -34,11 +35,17 @@ func runUninstall(out, errOut io.Writer, keepConfig bool) error {
 	if err != nil {
 		return fmt.Errorf("locating current executable: %w", err)
 	}
+	// Invoked through the `lp` alias, os.Executable can be the symlink itself;
+	// removing that would leave the real binary installed.
+	exe = resolveLinks(exe)
 
 	// Strip our hook entries from the CLI configs first, so we don't leave hooks
 	// pointing at a binary we're about to delete. Best-effort: never abort.
 	removeHooksBestEffort(errOut)
 
+	if err := removeAlias(exe, out); err != nil {
+		fmt.Fprintf(errOut, "Could not remove the %s alias: %v\n", BinaryAlias, err)
+	}
 	if err := removeExecutable(exe, out, errOut); err != nil {
 		return err
 	}
@@ -63,6 +70,43 @@ func runUninstall(out, errOut io.Writer, keepConfig bool) error {
 		fmt.Fprintf(out, "No config/cache dir found at %s\n", dir)
 	}
 	return nil
+}
+
+// removeAlias deletes the `lp` symlink installed next to exe. It only removes
+// a link that actually points at exe, so it can never take out an unrelated
+// binary that happens to share the name.
+func removeAlias(exe string, out io.Writer) error {
+	alias := filepath.Join(filepath.Dir(exe), BinaryAlias)
+	target, err := os.Readlink(alias)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		// Not a symlink (or unreadable): leave it alone.
+		return nil
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(alias), target)
+	}
+	// Resolve both sides: either path can run through a symlinked parent
+	// directory (/var -> /private/var on macOS), which is not a mismatch.
+	if resolveLinks(target) != resolveLinks(exe) {
+		return nil
+	}
+	if err := os.Remove(alias); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Removed %s\n", alias)
+	return nil
+}
+
+// resolveLinks returns path with symlinks resolved, or path unchanged when it
+// cannot be resolved (e.g. it no longer exists).
+func resolveLinks(path string) string {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return path
 }
 
 func removeExecutable(path string, out, errOut io.Writer) error {

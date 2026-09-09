@@ -45,6 +45,11 @@ spark   ✓ pinged (12.4s)
 - Auto-resumes parked tasks: `limitping continue <provider>` proxies the
   official CLI and types your continue message the moment the 5h limit
   recovers, so an overnight task doesn't sit at the limit until morning.
+- Spends Codex reset credits before they lapse: `limitping redeem` cashes one in
+  by hand, and `auto_redeem = true` lets `watch` / `continue` spend one on its
+  own once it is close to expiring — a banked reset is worth nothing after it
+  expires. Off by default, because redeeming is irreversible.
+- Types short: every command also works as `lp` (e.g. `lp s`, `lp w`).
 - Includes dry-run modes, weekly-limit guards, reset buffers, cheap-model
   defaults, macOS notifications, local config, and no telemetry.
 
@@ -209,12 +214,17 @@ Short aliases are also available for config commands: `limitping c i` for
 
 `limitping --help` lists aliases inline, for example `ping, p`.
 
+The binary itself has a short name too: the installer symlinks `lp` next to
+`limitping`, so `lp status`, `lp w`, and `limitping status` are the same
+command. (Building from source? `ln -s limitping /usr/local/bin/lp`.)
+
 | Command | Aliases |
 | --- | --- |
 | `status` | `s`, `stat` |
 | `ping` | `p` |
 | `watch` | `w` |
 | `schedule` | `sched` |
+| `redeem` | `r` |
 | `background` | `bg` |
 | `config` | `c`, `cfg` |
 | `config init` | `c i` |

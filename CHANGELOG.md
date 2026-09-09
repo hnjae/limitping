@@ -5,6 +5,17 @@ All notable changes to this project should be documented here.
 This project uses version tags such as `v0.2.0`. Release binaries are published
 through GitHub Actions and GoReleaser.
 
+## Unreleased
+
+- Every command now also answers to `lp`: the installer symlinks it next to
+  `limitping`, usage lines and help examples echo back whichever name was typed,
+  and `uninstall` removes the link. Install and uninstall both check ownership
+  first, so an unrelated `lp` on your PATH is never replaced or deleted.
+  `redeem` also picked up the short alias `r`.
+- `watch --help` and `continue --help` now document `auto_redeem`, and the
+  README highlights cover `redeem`, so spending a reset credit before it lapses
+  is discoverable from the commands it affects instead of only from the config.
+
 ## v0.9.0
 
 - New `limitping redeem` spends a banked Codex rate-limit reset credit (with

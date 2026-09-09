@@ -285,6 +285,8 @@ Arguments:
   provider  Optional. One of: claude, codex, spark, all.
             Defaults to all, which watches every enabled provider.
 
+Codex reset credits: set auto_redeem = true under [codex] in the config and watch also spends a banked reset credit that is about to lapse — within 24h when there is usage worth reclaiming, or in its final hour. Off by default because redeeming is irreversible; 'limitping redeem' spends one by hand.
+
 Examples:
   limitping watch
   limitping w claude
@@ -321,6 +323,8 @@ Arguments:
                verbatim, e.g. 'limitping continue codex --yolo'.
 
 The continue message is per-provider continue_prompt in the config (default "continue"; set it to e.g. "继续任务"). Quit from inside the CLI to exit.
+
+Codex reset credits: set auto_redeem = true under [codex] in the config and the same background watcher also spends a banked reset credit that is about to lapse — within 24h when there is usage worth reclaiming, or in its final hour — so a parked session can resume without waiting for the window. Off by default because redeeming is irreversible; 'limitping redeem' spends one by hand.
 
 Examples:
   limitping continue codex
@@ -545,6 +549,8 @@ var zhText = cliText{
   provider  可选。取值: claude、codex、spark、all。
             默认是 all，会监测所有已启用的 Provider。
 
+Codex 重置卡: 在配置的 [codex] 下设置 auto_redeem = true，watch 还会在重置卡临近过期时自动用掉它——剩余有效期 24h 内且确实有用量可回收，或进入最后 1 小时。因为兑换不可撤销，默认关闭；手动兑换用 'limitping redeem'。
+
 示例:
   limitping watch
   limitping w claude
@@ -581,6 +587,8 @@ var zhText = cliText{
                'limitping continue codex --yolo'。
 
 续跑消息取配置中各 Provider 的 continue_prompt（默认 "continue"，可改成如 "继续任务"）。退出请用该 CLI 自带的退出方式。
+
+Codex 重置卡: 在配置的 [codex] 下设置 auto_redeem = true，后台的同一个 watcher 还会在重置卡临近过期时自动用掉它——剩余有效期 24h 内且确实有用量可回收，或进入最后 1 小时——这样停在限额处的会话不必干等窗口重置。因为兑换不可撤销，默认关闭；手动兑换用 'limitping redeem'。
 
 示例:
   limitping continue codex

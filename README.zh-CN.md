@@ -37,6 +37,10 @@ spark   ✓ pinged (12.4s)
 - 通过 CLI 钩子识别正在进行中的 Claude/Codex 会话;Spark 通过 Codex CLI 运行,复用 Codex 钩子信号。
 - 自动续跑挂起的任务:`limitping continue <provider>` 代理官方 CLI,在 5h 限额恢复的
   瞬间自动输入续跑消息,让整夜的任务不用一直停在限额处等你回来。
+- 在 Codex 重置卡过期前用掉它:`limitping redeem` 手动兑换;开启 `auto_redeem = true`
+  后,`watch` / `continue` 会在卡临近过期时自动使用 —— 攒着的重置卡一旦过期就归零。
+  因为兑换不可撤销,默认关闭。
+- 命令名可以更短:所有命令都能用 `lp` 触发(例如 `lp s`、`lp w`)。
 - 内置 dry-run、周限额保护、重置缓冲、低成本模型默认值、macOS 通知、本地配置,且不带遥测。
 
 ## 快速开始
@@ -193,12 +197,16 @@ limitping uninstall            # 删除 limitping 以及配置/缓存(简称: rm
 
 `limitping --help` 会在命令列表中直接展示简称,例如 `ping, p`。
 
+程序本身也有短名:安装脚本会在 `limitping` 旁边建一个 `lp` 软链,所以 `lp status`、
+`lp w` 和 `limitping status` 完全等价。(从源码构建的话:`ln -s limitping /usr/local/bin/lp`。)
+
 | 命令 | 简称/别名 |
 | --- | --- |
 | `status` | `s`、`stat` |
 | `ping` | `p` |
 | `watch` | `w` |
 | `schedule` | `sched` |
+| `redeem` | `r` |
 | `background` | `bg` |
 | `config` | `c`、`cfg` |
 | `config init` | `c i` |

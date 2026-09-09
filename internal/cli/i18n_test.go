@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
@@ -175,4 +176,89 @@ func setLocale(t *testing.T, locale string) {
 		t.Setenv(key, "")
 	}
 	t.Setenv("LANG", locale)
+}
+
+func TestInvokedNameRecognizesOnlyTheAlias(t *testing.T) {
+	cases := map[string]string{
+		"/usr/local/bin/lp":        BinaryAlias,
+		"lp.exe":                   BinaryAlias,
+		"/usr/local/bin/limitping": "limitping",
+		"/tmp/go-build/cli.test":   "limitping",
+	}
+	for argv0, want := range cases {
+		t.Run(argv0, func(t *testing.T) {
+			old := os.Args
+			os.Args = []string{argv0}
+			defer func() { os.Args = old }()
+			if got := invokedName(); got != want {
+				t.Fatalf("invokedName() = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestRootUsageEchoesTheInvokedName(t *testing.T) {
+	setLocale(t, "C")
+	old := os.Args
+	os.Args = []string{"/usr/local/bin/" + BinaryAlias}
+	defer func() { os.Args = old }()
+
+	root := newRootCmd()
+	var out bytes.Buffer
+	root.SetOut(&out)
+	root.SetArgs([]string{"--help"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("help: %v", err)
+	}
+	if got := out.String(); !strings.Contains(got, BinaryAlias+" [command]") {
+		t.Fatalf("help output = %q, want usage lines using %q", got, BinaryAlias)
+	}
+}
+
+func TestHelpExamplesUseTheInvokedNameAndKeepTheProductName(t *testing.T) {
+	setLocale(t, "C")
+	old := os.Args
+	os.Args = []string{"/usr/local/bin/" + BinaryAlias}
+	defer func() { os.Args = old }()
+
+	root := newRootCmd()
+	watch, _, err := root.Find([]string{"watch"})
+	if err != nil {
+		t.Fatalf("find watch: %v", err)
+	}
+	if strings.Contains(watch.Long, "limitping watch") {
+		t.Errorf("watch help still shows `limitping watch` examples under the alias:\n%s", watch.Long)
+	}
+	if !strings.Contains(watch.Long, BinaryAlias+" watch") {
+		t.Errorf("watch help has no %q examples:\n%s", BinaryAlias+" watch", watch.Long)
+	}
+	// The product name is not an invocation, so prose keeps saying limitping.
+	if !strings.Contains(root.Long, "limitping pings") {
+		t.Errorf("root help rewrote the product name out of its prose:\n%s", root.Long)
+	}
+}
+
+func TestRedeemIsReachableByItsShortAlias(t *testing.T) {
+	root := newRootCmd()
+	cmd, _, err := root.Find([]string{"r"})
+	if err != nil {
+		t.Fatalf("find %q: %v", "r", err)
+	}
+	if cmd.Name() != "redeem" {
+		t.Fatalf("%q resolved to %q, want redeem", "r", cmd.Name())
+	}
+}
+
+func TestWatchAndContinueHelpDocumentAutoRedeem(t *testing.T) {
+	for _, text := range []cliText{enText, zhText} {
+		if !strings.Contains(text.watchLong, "auto_redeem") {
+			t.Error("watch help does not mention auto_redeem")
+		}
+		if !strings.Contains(text.continueLong, "auto_redeem") {
+			t.Error("continue help does not mention auto_redeem")
+		}
+		if !strings.Contains(text.watchLong, "redeem") || !strings.Contains(text.continueLong, "redeem") {
+			t.Error("watch/continue help does not point at the redeem command")
+		}
+	}
 }

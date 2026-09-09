@@ -9,6 +9,7 @@ set -eu
 
 REPO="wavever/CCLimitPing"
 BIN="limitping"
+ALIAS="lp" # short name, symlinked next to the binary
 
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 arch=$(uname -m)
@@ -57,6 +58,36 @@ else
 fi
 
 echo "Installed $BIN -> $dir/$BIN"
+
+# Short alias: `lp` behaves exactly like `limitping`. Claim the name only when
+# it is free or already our own link — never replace someone else's `lp`,
+# symlink or not. `uninstall` applies the same ownership test before removing.
+alias_path="$dir/$ALIAS"
+alias_ours=1
+if [ -e "$alias_path" ] || [ -L "$alias_path" ]; then
+  alias_ours=0
+  if [ -L "$alias_path" ]; then
+    alias_target=$(readlink "$alias_path")
+    case "$alias_target" in
+      /*) ;;
+      *) alias_target="$dir/$alias_target" ;;
+    esac
+    if [ "$alias_target" = "$dir/$BIN" ]; then
+      alias_ours=1
+    fi
+  fi
+fi
+
+if [ "$alias_ours" -eq 1 ]; then
+  if ln -sf "$BIN" "$alias_path" 2>/dev/null || sudo ln -sf "$BIN" "$alias_path" 2>/dev/null; then
+    echo "Installed $ALIAS -> $dir/$BIN (short alias)"
+  else
+    echo "NOTE: could not create the $ALIAS symlink in $dir; use the full \`$BIN\` name,"
+    echo "      or link it yourself: ln -s $BIN $alias_path"
+  fi
+else
+  echo "NOTE: $alias_path already exists and is not our symlink; skipped the short alias."
+fi
 case ":$PATH:" in
   *":$dir:"*) ;;
   *)

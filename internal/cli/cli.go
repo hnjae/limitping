@@ -3,6 +3,10 @@ package cli
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -15,6 +19,21 @@ import (
 // Version is the binary version, overridable at build time via -ldflags.
 var Version = "0.9.0"
 
+// BinaryAlias is the short name installed alongside the binary, so `lp` is
+// interchangeable with `limitping`. install.sh creates it as a symlink and
+// `uninstall` removes it.
+const BinaryAlias = "lp"
+
+// invokedName is the name limitping was called as, so usage lines echo back the
+// command the user actually typed. Only the alias is recognized: any other name
+// (a renamed binary, the test runner) reads as limitping.
+func invokedName() string {
+	if strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe") == BinaryAlias {
+		return BinaryAlias
+	}
+	return "limitping"
+}
+
 // Execute runs the root command.
 func Execute() error {
 	return newRootCmd().Execute()
@@ -23,7 +42,7 @@ func Execute() error {
 func newRootCmd() *cobra.Command {
 	text := localizedText()
 	root := &cobra.Command{
-		Use:           "limitping",
+		Use:           invokedName(),
 		Short:         text.rootShort,
 		Long:          text.rootLong,
 		SilenceUsage:  true,
@@ -36,7 +55,68 @@ func newRootCmd() *cobra.Command {
 	localizeCompletionCommand(root, text)
 	root.SetHelpCommand(newHelpCommand(text))
 	localizeHelpFlags(root, text)
+	localizeInvocations(root)
 	return root
+}
+
+// localizeInvocations rewrites the `limitping <command>` examples in the help
+// text to whichever name the binary was invoked as, so they stay copy-pasteable
+// under the alias. Only invocations are touched: a bare "limitping" is the
+// product name ("limitping watches usage in the background") and stays put.
+// A no-op unless the alias was used.
+func localizeInvocations(root *cobra.Command) {
+	name := invokedName()
+	if name == "limitping" {
+		return
+	}
+	// Execute() attaches the help command; do it now so `limitping help` in the
+	// usage footer counts as an invocation. Idempotent, and Execute repeats it.
+	root.InitDefaultHelpCmd()
+	pattern := invocationPattern(root)
+	rewrite := func(s string) string {
+		if s == "" {
+			return s
+		}
+		return pattern.ReplaceAllString(s, name+" $1")
+	}
+	var walk func(*cobra.Command)
+	walk = func(cmd *cobra.Command) {
+		cmd.Short = rewrite(cmd.Short)
+		cmd.Long = rewrite(cmd.Long)
+		cmd.Example = rewrite(cmd.Example)
+		for _, child := range cmd.Commands() {
+			walk(child)
+		}
+	}
+	walk(root)
+
+	// The usage footer ("Type limitping help [command] ...") lives in the
+	// template, which children inherit from the root.
+	if tmpl := rewrite(root.UsageTemplate()); tmpl != root.UsageTemplate() {
+		root.SetUsageTemplate(tmpl)
+	}
+}
+
+// invocationPattern matches "limitping " followed by a real command name or
+// alias from the tree (at a word boundary, so the prose "limitping watches" is
+// left alone), plus the flag forms.
+func invocationPattern(root *cobra.Command) *regexp.Regexp {
+	seen := map[string]bool{}
+	tokens := []string{`--?\w[\w-]*`} // --help, -h
+	var collect func(*cobra.Command)
+	collect = func(cmd *cobra.Command) {
+		for _, child := range cmd.Commands() {
+			for _, token := range append([]string{child.Name()}, child.Aliases...) {
+				if !seen[token] {
+					seen[token] = true
+					tokens = append(tokens, regexp.QuoteMeta(token))
+				}
+			}
+			collect(child)
+		}
+	}
+	collect(root)
+	return regexp.MustCompile(`\blimitping ((?:` + strings.Join(tokens, "|") + `)\b)`)
 }
 
 func newHelpCommand(text cliText) *cobra.Command {
