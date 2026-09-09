@@ -45,7 +45,7 @@ func newUsageHTTPClient() *http.Client {
 
 // Provider abstracts a single AI coding provider.
 type Provider interface {
-	// Name is the stable identifier ("claude", "codex", "spark").
+	// Name is the stable identifier ("claude", "codex").
 	Name() string
 	// ReadUsage fetches the current rate-limit snapshot. This is a read-only
 	// call against the provider's usage endpoint and consumes no quota.
@@ -87,7 +87,12 @@ type ResetCreditRedeemer interface {
 // consumed (parsed from the CLI's machine-readable output). CostUSD is 0 when
 // the provider doesn't report a cost (e.g. Codex).
 type TriggerResult struct {
-	Command      string
+	Command string
+	// Model is the model the ping actually runs on, resolved past an unset
+	// config to whatever the provider's own CLI would pick. Empty when that
+	// cannot be determined locally. It exists because the command line only
+	// names the model when limitping passes one explicitly.
+	Model        string
 	HasUsage     bool
 	InputTokens  int
 	OutputTokens int

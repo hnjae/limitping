@@ -152,79 +152,6 @@ func TestCodexReadUsageWeeklyOnlyRegime(t *testing.T) {
 	}
 }
 
-func TestSparkReadUsageReportsSparkProvider(t *testing.T) {
-	oldClient := usageHTTPClient
-	defer func() { usageHTTPClient = oldClient }()
-
-	fakeCodexHome(t)
-
-	usageHTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
-		body := `{
-			"plan_type": "plus",
-			"rate_limit": {
-				"limit_reached": false,
-				"primary_window": {"used_percent": 5, "limit_window_seconds": 18000, "reset_at": 4102444800},
-				"secondary_window": {"used_percent": 7, "limit_window_seconds": 604800, "reset_at": 4103049600}
-			},
-			"additional_rate_limits": [
-				{
-					"limit_name": "GPT-5.3-Codex-Spark",
-					"metered_feature": "codex_bengalfox",
-					"rate_limit": {
-						"limit_reached": false,
-						"primary_window": {"used_percent": 1, "limit_window_seconds": 18000, "reset_at": 4102444900},
-						"secondary_window": {"used_percent": 2, "limit_window_seconds": 604800, "reset_at": 4103049700}
-					}
-				}
-			]
-		}`
-		return &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(body)),
-			Request:    req,
-		}, nil
-	})}
-
-	u, err := NewSpark(config.ProviderConfig{}).ReadUsage(context.Background())
-	if err != nil {
-		t.Fatalf("ReadUsage: %v", err)
-	}
-	if u.Provider != "spark" || u.Plan != "plus" {
-		t.Fatalf("usage = %#v, want spark/plus", u)
-	}
-	if u.FiveHour.UsedPercent != 1 || u.Weekly.UsedPercent != 2 {
-		t.Fatalf("windows = %#v %#v", u.FiveHour, u.Weekly)
-	}
-}
-
-func TestSparkReadUsageRequiresSparkLimit(t *testing.T) {
-	oldClient := usageHTTPClient
-	defer func() { usageHTTPClient = oldClient }()
-
-	fakeCodexHome(t)
-
-	usageHTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
-		body := `{
-			"plan_type": "plus",
-			"rate_limit": {
-				"limit_reached": false,
-				"primary_window": {"used_percent": 5, "limit_window_seconds": 18000, "reset_at": 4102444800},
-				"secondary_window": {"used_percent": 7, "limit_window_seconds": 604800, "reset_at": 4103049600}
-			}
-		}`
-		return &http.Response{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(body)),
-			Request:    req,
-		}, nil
-	})}
-
-	_, err := NewSpark(config.ProviderConfig{}).ReadUsage(context.Background())
-	if err == nil || !strings.Contains(err.Error(), `model "gpt-5.3-codex-spark"`) {
-		t.Fatalf("ReadUsage error = %v, want missing spark limit", err)
-	}
-}
-
 func TestCodexReadUsageIgnoresResetCreditFailure(t *testing.T) {
 	oldClient := usageHTTPClient
 	defer func() { usageHTTPClient = oldClient }()
@@ -296,7 +223,7 @@ func TestCodexResetCreditsURLFromBase(t *testing.T) {
 
 func TestParseCodexBaseURL(t *testing.T) {
 	contents := `
-model = "gpt-5.4-mini"
+model = "gpt-5.6-luna"
 chatgpt_base_url = "https://api.openai.com"
 `
 	if got := parseCodexBaseURL(contents); got != "https://api.openai.com" {
@@ -307,7 +234,7 @@ chatgpt_base_url = "https://api.openai.com"
 func TestCodexTriggerDryRunUsesInteractiveCommand(t *testing.T) {
 	c := NewCodex(config.ProviderConfig{
 		Prompt:          "ok",
-		Model:           "gpt-5.4-mini",
+		Model:           "gpt-5.6-luna",
 		ReasoningEffort: "low",
 		ExtraArgs: []string{
 			"--skip-git-repo-check",
@@ -322,32 +249,12 @@ func TestCodexTriggerDryRunUsesInteractiveCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dry-run trigger: %v", err)
 	}
-	want := "codex -c model_reasoning_effort=low -m gpt-5.4-mini --search --sandbox read-only ok"
+	want := "codex --disable hooks -c model_reasoning_effort=low -m gpt-5.6-luna --search --sandbox read-only ok"
 	if res.Command != want {
 		t.Fatalf("command = %q, want %q", res.Command, want)
 	}
 	if strings.Contains(res.Command, "exec") || strings.Contains(res.Command, "--json") {
 		t.Fatalf("command still uses headless mode: %q", res.Command)
-	}
-}
-
-func TestSparkTriggerDryRunUsesSparkModel(t *testing.T) {
-	c := NewSpark(config.ProviderConfig{
-		Prompt:          "ok",
-		Model:           "gpt-5.3-codex-spark",
-		ReasoningEffort: "low",
-	})
-
-	if c.Name() != "spark" {
-		t.Fatalf("Name() = %q, want spark", c.Name())
-	}
-	res, err := c.Trigger(context.Background(), true)
-	if err != nil {
-		t.Fatalf("dry-run trigger: %v", err)
-	}
-	want := "codex -c model_reasoning_effort=low -m gpt-5.3-codex-spark ok"
-	if res.Command != want {
-		t.Fatalf("command = %q, want %q", res.Command, want)
 	}
 }
 
@@ -518,5 +425,221 @@ func TestCodexConsumeURLFromBase(t *testing.T) {
 		if got := codexResetURLFromBase(base, codexConsumePath); got != want {
 			t.Fatalf("codexResetURLFromBase(%q) = %q, want %q", base, got, want)
 		}
+	}
+}
+
+// catalogEntry mirrors the fields limitping reads out of the Codex CLI's
+// models_cache.json.
+type catalogEntry struct {
+	slug        string
+	visibility  string
+	priority    int
+	description string
+}
+
+func writeCodexModelsCache(t *testing.T, models ...catalogEntry) {
+	t.Helper()
+	entries := make([]map[string]any, 0, len(models))
+	for _, m := range models {
+		entries = append(entries, map[string]any{
+			"slug":        m.slug,
+			"visibility":  m.visibility,
+			"priority":    m.priority,
+			"description": m.description,
+		})
+	}
+	data, err := json.Marshal(map[string]any{"models": entries})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(os.Getenv("CODEX_HOME"), "models_cache.json")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCodexTriggerRejectsRetiredModel(t *testing.T) {
+	fakeCodexHome(t)
+	writeCodexModelsCache(t,
+		catalogEntry{slug: "gpt-6-astra", visibility: "list", priority: 1},
+		catalogEntry{slug: "gpt-5.6-luna", visibility: "list", priority: 8},
+		catalogEntry{slug: "codex-auto-review", visibility: "hide", priority: 43},
+	)
+
+	c := NewCodex(config.ProviderConfig{Prompt: "ok", Model: "gpt-5.4-mini"})
+	_, err := c.Trigger(context.Background(), true)
+	if err == nil {
+		t.Fatal("dry-run trigger succeeded, want a retired-model error")
+	}
+	for _, want := range []string{`"gpt-5.4-mini"`, "gpt-6-astra", "gpt-5.6-luna", "models_cache.json"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not mention %q", err, want)
+		}
+	}
+	// Internal models are valid but not worth suggesting.
+	if strings.Contains(err.Error(), "codex-auto-review") {
+		t.Errorf("error suggests a hidden model: %q", err)
+	}
+}
+
+func TestCodexTriggerAcceptsCataloguedAndUnsetModels(t *testing.T) {
+	fakeCodexHome(t)
+	writeCodexModelsCache(t,
+		catalogEntry{slug: "gpt-5.6-luna", visibility: "list", priority: 8},
+		catalogEntry{slug: "codex-auto-review", visibility: "hide", priority: 43},
+	)
+
+	for _, model := range []string{"gpt-5.6-luna", "codex-auto-review", ""} {
+		c := NewCodex(config.ProviderConfig{Prompt: "ok", Model: model})
+		if _, err := c.Trigger(context.Background(), true); err != nil {
+			t.Errorf("model %q rejected: %v", model, err)
+		}
+	}
+}
+
+// The catalog is a private Codex file. If it is missing or unreadable the ping
+// must still go out — a stale model is a likelier failure than no cache at all,
+// but guessing wrong here would block pings that would have worked.
+func TestCodexTriggerSkipsModelCheckWithoutCatalog(t *testing.T) {
+	fakeCodexHome(t)
+
+	c := NewCodex(config.ProviderConfig{Prompt: "ok", Model: "anything-at-all"})
+	if _, err := c.Trigger(context.Background(), true); err != nil {
+		t.Fatalf("trigger without a models cache: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(os.Getenv("CODEX_HOME"), "models_cache.json"), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Trigger(context.Background(), true); err != nil {
+		t.Fatalf("trigger with an unparseable models cache: %v", err)
+	}
+}
+
+// With no model configured the ping must land on the cheapest catalogued model,
+// not on the working model the user set in the Codex CLI — a ping only needs to
+// be billable, and a working model is typically a much pricier tier.
+func TestCodexUnsetModelPicksTheCheapestOverTheCLIWorkingModel(t *testing.T) {
+	fakeCodexHome(t)
+	writeCodexModelsCache(t,
+		catalogEntry{slug: "gpt-6-astra", visibility: "list", priority: 1,
+			description: "Our most capable model for complex, demanding work."},
+		catalogEntry{slug: "gpt-5.6-sol", visibility: "list", priority: 6,
+			description: "Reliable agentic workhorse for everyday tasks."},
+		catalogEntry{slug: "gpt-5.6-luna", visibility: "list", priority: 8,
+			description: "Fast and affordable agentic coding model."},
+		catalogEntry{slug: "gpt-5.5", visibility: "list", priority: 12,
+			description: "Proven previous-generation model for coding and general work."},
+		// Hidden but also budget-tier: never chosen on the user's behalf.
+		catalogEntry{slug: "gpt-reserve", visibility: "hide", priority: 3,
+			description: "Fast and affordable agentic coding model."},
+	)
+	writeCodexCLIConfig(t, `model = "gpt-5.6-sol"`)
+
+	res, err := NewCodex(config.ProviderConfig{Prompt: "ok"}).Trigger(context.Background(), true)
+	if err != nil {
+		t.Fatalf("dry-run trigger: %v", err)
+	}
+	if res.Model != "gpt-5.6-luna" {
+		t.Fatalf("Model = %q, want the cheapest catalogued model", res.Model)
+	}
+	if !strings.Contains(res.Command, "-m gpt-5.6-luna") {
+		t.Fatalf("command = %q, want the cheapest model pinned with -m", res.Command)
+	}
+}
+
+// Among several budget-tier entries, the one Codex itself ranks furthest from
+// its flagship wins, so the choice is deterministic rather than catalog-order
+// dependent.
+func TestCodexCheapestModelPrefersTheLowestRanked(t *testing.T) {
+	fakeCodexHome(t)
+	writeCodexModelsCache(t,
+		catalogEntry{slug: "budget-new", visibility: "list", priority: 4, description: "Fast and affordable."},
+		catalogEntry{slug: "budget-old", visibility: "list", priority: 9, description: "Fast and affordable."},
+		catalogEntry{slug: "flagship", visibility: "list", priority: 1, description: "Our most capable model."},
+	)
+	if got := codexCheapestModel(); got != "budget-old" {
+		t.Fatalf("codexCheapestModel() = %q, want budget-old", got)
+	}
+}
+
+// A "mini"-style slug is the other naming OpenAI has used for budget variants.
+func TestCodexCheapestModelRecognizesMiniNaming(t *testing.T) {
+	fakeCodexHome(t)
+	writeCodexModelsCache(t,
+		catalogEntry{slug: "gpt-9", visibility: "list", priority: 1, description: "Our most capable model."},
+		catalogEntry{slug: "gpt-9-mini", visibility: "list", priority: 5, description: "Smaller variant."},
+	)
+	if got := codexCheapestModel(); got != "gpt-9-mini" {
+		t.Fatalf("codexCheapestModel() = %q, want gpt-9-mini", got)
+	}
+}
+
+// Nothing recognizably budget-tier: fall back to letting the CLI choose, and
+// report what that will be rather than guessing a model on stale price wording.
+func TestCodexUnsetModelFallsBackToTheCLIWhenNoBudgetTierExists(t *testing.T) {
+	fakeCodexHome(t)
+	writeCodexModelsCache(t,
+		catalogEntry{slug: "gpt-6-astra", visibility: "list", priority: 1,
+			description: "Our most capable model for complex, demanding work."},
+	)
+	writeCodexCLIConfig(t, `model = "gpt-6-astra"`)
+
+	res, err := NewCodex(config.ProviderConfig{Prompt: "ok"}).Trigger(context.Background(), true)
+	if err != nil {
+		t.Fatalf("dry-run trigger: %v", err)
+	}
+	if strings.Contains(res.Command, "-m ") {
+		t.Fatalf("command = %q, want no -m when no budget tier is identifiable", res.Command)
+	}
+	if res.Model != "gpt-6-astra" {
+		t.Fatalf("Model = %q, want the CLI's own configured model reported", res.Model)
+	}
+}
+
+// An explicit limitping model always wins over the catalog pick.
+func TestCodexConfiguredModelWinsOverTheCheapest(t *testing.T) {
+	fakeCodexHome(t)
+	writeCodexModelsCache(t,
+		catalogEntry{slug: "gpt-5.6-luna", visibility: "list", priority: 8, description: "Fast and affordable."},
+		catalogEntry{slug: "gpt-5.5", visibility: "list", priority: 12, description: "Previous generation."},
+	)
+
+	res, err := NewCodex(config.ProviderConfig{Prompt: "ok", Model: "gpt-5.5"}).Trigger(context.Background(), true)
+	if err != nil {
+		t.Fatalf("dry-run trigger: %v", err)
+	}
+	if res.Model != "gpt-5.5" || !strings.Contains(res.Command, "-m gpt-5.5") {
+		t.Fatalf("Model = %q, command = %q, want the configured model", res.Model, res.Command)
+	}
+}
+
+func writeCodexCLIConfig(t *testing.T, contents string) {
+	t.Helper()
+	path := filepath.Join(os.Getenv("CODEX_HOME"), "config.toml")
+	if err := os.WriteFile(path, []byte(contents+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Both halves of the silent-no-op bug: with an unreviewed hook the Codex TUI
+// opens on a blocking trust prompt, and a zero-sized PTY makes it render
+// nothing at all. Either way the prompt is never submitted, no request is
+// dispatched, the 5h window never starts — and the session still exits cleanly,
+// so the ping reported success.
+func TestCodexTriggerDisablesHooksSoTheTUIDoesNotBlockOnTrust(t *testing.T) {
+	fakeCodexHome(t)
+	res, err := NewCodex(config.ProviderConfig{Prompt: "ok"}).Trigger(context.Background(), true)
+	if err != nil {
+		t.Fatalf("dry-run trigger: %v", err)
+	}
+	if !strings.HasPrefix(res.Command, "codex --disable hooks ") {
+		t.Fatalf("command = %q, want hooks disabled for the ping session", res.Command)
+	}
+}
+
+func TestCodexPTYSizeIsANonZeroTerminal(t *testing.T) {
+	if codexPTYRows == 0 || codexPTYCols == 0 {
+		t.Fatal("the Codex TUI renders nothing into a zero-sized viewport")
 	}
 }

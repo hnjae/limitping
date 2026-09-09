@@ -17,7 +17,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"github.com/BurntSushi/toml"
 	"github.com/creack/pty"
@@ -35,11 +34,16 @@ const (
 	codexConsumePath    = "/wham/rate-limit-reset-credits/consume"
 	codexAPIPath        = "/api/codex/usage"
 	codexUserAgent      = "limitping"
-	sparkDefaultModel   = "gpt-5.3-codex-spark"
 
 	// codexRedeemCooldown throttles the automatic redemption path so a
 	// once-a-minute poll loop cannot re-attempt a refused redemption every cycle.
 	codexRedeemCooldown = 15 * time.Minute
+
+	// The PTY needs a plausible size for the Codex TUI to lay out and render at
+	// all; the exact numbers only have to be big enough to be a believable
+	// terminal, since nothing reads the rendering back.
+	codexPTYRows = 40
+	codexPTYCols = 120
 
 	codexTurnMinWait  = 4 * time.Second
 	codexTurnQuiet    = 2500 * time.Millisecond
@@ -77,7 +81,7 @@ func (c *Codex) ReadUsage(ctx context.Context) (*usage.Usage, error) {
 	if err != nil {
 		return nil, err
 	}
-	u := codexUsageToUsage(c.Name(), body, r, r.RateLimit)
+	u := codexUsageToUsage(c.Name(), body, r)
 	if credits, err := readCodexResetCredits(ctx, c.auth); err == nil {
 		u.ResetCredits = credits
 	} else if r.ResetCredits != nil {
@@ -190,52 +194,10 @@ func creditIdempotencyKey(c usage.ResetCredit) string {
 	return hex.EncodeToString(sum[:16])
 }
 
-// Spark is a separate provider backed by Codex auth and CLI transport.
-// Its usage window is the Spark-specific entry inside the Codex usage payload.
-type Spark struct {
-	cfg  config.ProviderConfig
-	auth *auth.CodexAuth
-}
-
-// NewSpark returns the Spark provider. It shares Codex credentials and the
-// Codex CLI binary, but it owns provider identity and usage selection.
-func NewSpark(cfg config.ProviderConfig) *Spark {
-	if cfg.Model == "" {
-		cfg.Model = sparkDefaultModel
-	}
-	return &Spark{
-		cfg:  cfg,
-		auth: auth.NewCodexAuth(),
-	}
-}
-
-func (s *Spark) Name() string { return "spark" }
-
-func (s *Spark) ActiveTask(ctx context.Context) (string, bool, error) {
-	return codexActiveTask(ctx)
-}
-
-func (s *Spark) ReadUsage(ctx context.Context) (*usage.Usage, error) {
-	body, r, err := readCodexUsage(ctx, s.auth)
-	if err != nil {
-		return nil, err
-	}
-	rateLimit, err := sparkRateLimitFromResponse(r, s.cfg.Model)
-	if err != nil {
-		return nil, err
-	}
-	return codexUsageToUsage(s.Name(), body, r, rateLimit), nil
-}
-
-func (s *Spark) Trigger(ctx context.Context, dryRun bool) (*TriggerResult, error) {
-	return triggerCodex(ctx, s.cfg, dryRun)
-}
-
 func codexActiveTask(_ context.Context) (string, bool, error) {
 	// Active-session detection relies entirely on the Codex CLI hooks (see
 	// `limitping hooks install`). Without them we don't guess from the process
-	// list; the scheduler just pings. Spark uses the same activity signal
-	// because its actual CLI session is still `codex`.
+	// list; the scheduler just pings.
 	if !activity.Enabled("codex") {
 		return "", false, nil
 	}
@@ -249,20 +211,15 @@ type codexWindow struct {
 }
 
 // The windows are pointers because the backend nulls out a window when that
-// limit is not currently enforced: since OpenAI temporarily removed the 5h
-// limit on 2026-07-12, primary_window carries the weekly window and
-// secondary_window is null.
+// limit is not currently enforced. OpenAI did exactly that between 2026-07-12
+// and (at the latest) 2026-09-09, when the 5h limit was gone and primary_window
+// carried the weekly one — hence codexWindowsFromRateLimit classifying by
+// length rather than by position.
 type codexRateLimit struct {
 	Allowed      bool         `json:"allowed"`
 	LimitReached bool         `json:"limit_reached"`
 	Primary      *codexWindow `json:"primary_window"`
 	Secondary    *codexWindow `json:"secondary_window"`
-}
-
-type codexAdditionalRateLimit struct {
-	LimitName      string         `json:"limit_name"`
-	MeteredFeature string         `json:"metered_feature"`
-	RateLimit      codexRateLimit `json:"rate_limit"`
 }
 
 type codexCredits struct {
@@ -272,11 +229,10 @@ type codexCredits struct {
 }
 
 type codexUsageResp struct {
-	PlanType             string                     `json:"plan_type"`
-	RateLimit            codexRateLimit             `json:"rate_limit"`
-	AdditionalRateLimits []codexAdditionalRateLimit `json:"additional_rate_limits"`
-	Credits              *codexCredits              `json:"credits"`
-	ResetCredits         *codexInlineResetCredits   `json:"rate_limit_reset_credits"`
+	PlanType     string                   `json:"plan_type"`
+	RateLimit    codexRateLimit           `json:"rate_limit"`
+	Credits      *codexCredits            `json:"credits"`
+	ResetCredits *codexInlineResetCredits `json:"rate_limit_reset_credits"`
 }
 
 // codexInlineResetCredits is the reset-credit count embedded in the usage
@@ -350,14 +306,14 @@ func readCodexResetCredits(ctx context.Context, auth *auth.CodexAuth) (*usage.Re
 	return codexResetCreditsToUsage(r), nil
 }
 
-func codexUsageToUsage(provider string, body []byte, r codexUsageResp, rateLimit codexRateLimit) *usage.Usage {
-	fiveHour, weekly := codexWindowsFromRateLimit(rateLimit)
+func codexUsageToUsage(provider string, body []byte, r codexUsageResp) *usage.Usage {
+	fiveHour, weekly := codexWindowsFromRateLimit(r.RateLimit)
 	u := &usage.Usage{
 		Provider:     provider,
 		Plan:         r.PlanType,
 		FetchedAt:    time.Now(),
 		Raw:          body,
-		LimitReached: rateLimit.LimitReached,
+		LimitReached: r.RateLimit.LimitReached,
 		FiveHour:     fiveHour,
 		Weekly:       weekly,
 	}
@@ -400,26 +356,6 @@ func parseCodexResetTime(raw string) time.Time {
 		return time.Time{}
 	}
 	return t
-}
-
-func sparkRateLimitFromResponse(r codexUsageResp, model string) (codexRateLimit, error) {
-	target := normalizeCodexLimitName(model)
-	for _, additional := range r.AdditionalRateLimits {
-		if normalizeCodexLimitName(additional.LimitName) == target {
-			return additional.RateLimit, nil
-		}
-	}
-	return codexRateLimit{}, fmt.Errorf("codex usage: no rate limit found for provider %q model %q", "spark", model)
-}
-
-func normalizeCodexLimitName(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			b.WriteRune(unicode.ToLower(r))
-		}
-	}
-	return b.String()
 }
 
 func codexUsageURL() string {
@@ -506,6 +442,38 @@ func parseCodexBaseURL(contents string) string {
 	return strings.TrimSpace(cfg.ChatGPTBaseURL)
 }
 
+// codexPingModel resolves the model to pass to `codex -m`. An unset config
+// means "spend as little as possible", not "use my Codex working model": the
+// cheapest catalogued model is picked explicitly. Empty means the catalog could
+// not answer, and the CLI is left to choose as before.
+func codexPingModel(configured string) string {
+	if configured != "" {
+		return configured
+	}
+	return codexCheapestModel()
+}
+
+// codexCLIConfiguredModel is the model set in the Codex CLI's own config, used
+// only to report what an un-pinned ping will run on. It is never chosen: a
+// working model is typically a much more expensive tier than a ping needs.
+func codexCLIConfiguredModel() string {
+	contents, err := os.ReadFile(codexConfigPath())
+	if err != nil {
+		return ""
+	}
+	return parseCodexModel(string(contents))
+}
+
+func parseCodexModel(contents string) string {
+	var cfg struct {
+		Model string `toml:"model"`
+	}
+	if _, err := toml.Decode(contents, &cfg); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(cfg.Model)
+}
+
 func codexConfigPath() string {
 	if h := os.Getenv("CODEX_HOME"); h != "" {
 		return filepath.Join(h, "config.toml")
@@ -515,6 +483,128 @@ func codexConfigPath() string {
 		return filepath.Join(".codex", "config.toml")
 	}
 	return filepath.Join(home, ".codex", "config.toml")
+}
+
+func codexModelsCachePath() string {
+	return filepath.Join(filepath.Dir(codexConfigPath()), "models_cache.json")
+}
+
+// checkCodexModel rejects a configured model the Codex CLI's own catalog no
+// longer lists. OpenAI retires Codex models every few months and `codex -m`
+// is not validated locally, so without this a stale config fails as an opaque
+// server-side error at window rollover — precisely when nobody is watching.
+// The catalog is a private Codex file: any problem reading it skips the check
+// rather than blocking a ping that would otherwise have worked.
+func checkCodexModel(model string) error {
+	if model == "" {
+		return nil // resolved from the catalog, so never stale
+	}
+	catalog := codexModelCatalog()
+	if len(catalog) == 0 {
+		return nil
+	}
+	var available []string
+	for _, m := range catalog {
+		if m.Slug == model {
+			return nil
+		}
+		if m.Listed {
+			available = append(available, m.Slug)
+		}
+	}
+	if len(available) == 0 {
+		for _, m := range catalog {
+			available = append(available, m.Slug)
+		}
+	}
+	return fmt.Errorf("codex model %q is no longer in the Codex model catalog (%s); available: %s — update model under [codex] in limitping's config, or set it to \"\" to let limitping pick the cheapest one",
+		model, codexModelsCachePath(), strings.Join(available, ", "))
+}
+
+// codexCatalogModel is one entry of the Codex CLI's cached model catalog.
+// Listed reflects visibility: the catalog hides internal models such as
+// codex-auto-review, which are valid to pass but must never be chosen or
+// suggested on the user's behalf.
+type codexCatalogModel struct {
+	Slug        string
+	Description string
+	Priority    int
+	Listed      bool
+}
+
+// codexModelCatalog reads the models the Codex CLI last cached for this
+// account. It returns nil when the cache is missing or unparseable.
+func codexModelCatalog() []codexCatalogModel {
+	data, err := os.ReadFile(codexModelsCachePath())
+	if err != nil {
+		return nil
+	}
+	var cache struct {
+		Models []struct {
+			Slug        string `json:"slug"`
+			Description string `json:"description"`
+			Visibility  string `json:"visibility"`
+			Priority    int    `json:"priority"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(data, &cache); err != nil {
+		return nil
+	}
+	models := make([]codexCatalogModel, 0, len(cache.Models))
+	for _, m := range cache.Models {
+		if m.Slug == "" {
+			continue
+		}
+		models = append(models, codexCatalogModel{
+			Slug:        m.Slug,
+			Description: m.Description,
+			Priority:    m.Priority,
+			Listed:      m.Visibility == "list",
+		})
+	}
+	return models
+}
+
+// codexBudgetMarkers are the words OpenAI uses for its low-cost tier, matched
+// against a model's description and slug. The catalog carries no price field,
+// so this wording is the only cost signal it exposes ("Fast and affordable
+// agentic coding model"), alongside the "mini"-style naming used for budget
+// variants.
+var codexBudgetMarkers = []string{"affordable", "cheap", "low cost", "low-cost", "mini"}
+
+// codexCheapestModel picks the model a ping should use when none is configured.
+// A ping only has to be a billable request — the model does not matter — so it
+// should land on the cheapest one the plan offers rather than on whatever the
+// user set as their working model in the Codex CLI, which is typically a far
+// more expensive tier.
+//
+// Ties break toward the largest priority, i.e. the entry Codex itself ranks
+// furthest from its flagship. Returns "" when the catalog is unreadable or
+// nothing is recognizably the budget tier: guessing a model on price wording
+// that no longer exists would be worse than letting the CLI decide.
+func codexCheapestModel() string {
+	best := codexCatalogModel{Priority: -1}
+	for _, m := range codexModelCatalog() {
+		if !m.Listed || !codexIsBudgetModel(m) {
+			continue
+		}
+		// Largest priority wins; slug breaks an exact tie so the choice is
+		// stable across catalog orderings.
+		if m.Priority > best.Priority || (m.Priority == best.Priority && m.Slug < best.Slug) {
+			best = m
+		}
+	}
+	return best.Slug
+}
+
+func codexIsBudgetModel(m codexCatalogModel) bool {
+	haystack := strings.ToLower(m.Description + " " + m.Slug)
+	for _, marker := range codexBudgetMarkers {
+		if strings.Contains(haystack, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // codexWindowsFromRateLimit classifies the windows by length rather than
@@ -555,22 +645,46 @@ func triggerCodex(ctx context.Context, cfg config.ProviderConfig, dryRun bool) (
 	if prompt == "" {
 		prompt = "ok"
 	}
-	args := []string{}
+	// A ping is a synthetic session, so the user's Codex hooks have no business
+	// running for it — and leaving them on is not merely untidy: an unreviewed
+	// hook makes the TUI open on a blocking "Hooks need review" prompt that no
+	// keystroke of ours answers, so the ping silently never submits anything.
+	args := []string{"--disable", "hooks"}
 	if cfg.ReasoningEffort != "" {
 		args = append(args, "-c", "model_reasoning_effort="+cfg.ReasoningEffort)
 	}
-	if cfg.Model != "" {
-		args = append(args, "-m", cfg.Model)
+	model := codexPingModel(cfg.Model)
+	if model != "" {
+		args = append(args, "-m", model)
 	}
 	args = append(args, codexInteractiveArgs(cfg.ExtraArgs)...)
 	args = append(args, prompt)
-	res := &TriggerResult{Command: "codex " + shellJoin(args)}
+	reported := model
+	if reported == "" {
+		// Nothing was pinned, so the CLI picks; report its choice rather than
+		// leaving the ping silent about what it spent quota on.
+		reported = codexCLIConfiguredModel()
+	}
+	res := &TriggerResult{
+		Command: "codex " + shellJoin(args),
+		Model:   reported,
+	}
+	// Checked before the dry-run return too: a dry run that prints a command
+	// which cannot succeed is worse than no dry run.
+	if err := checkCodexModel(cfg.Model); err != nil {
+		return res, err
+	}
 	if dryRun {
 		return res, nil
 	}
 
 	cmd := exec.CommandContext(ctx, "codex", args...)
-	ptmx, err := pty.Start(cmd)
+	// pty.Start would hand the child a 0x0 terminal. Claude Code tolerates that,
+	// but the Codex TUI draws nothing into a zero-sized viewport: it emits its
+	// terminal-capability queries and then sits there forever, so the prompt is
+	// never submitted, no request is dispatched, and the window never starts —
+	// while the session still exits cleanly and reads as a successful ping.
+	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: codexPTYRows, Cols: codexPTYCols})
 	if err != nil {
 		return res, fmt.Errorf("codex interactive failed to start: %w", err)
 	}

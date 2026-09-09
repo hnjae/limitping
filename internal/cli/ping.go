@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -22,7 +23,7 @@ func newPingCmd() *cobra.Command {
 		Short:     text.pingShort,
 		Long:      text.pingLong,
 		Args:      cobra.MatchAll(cobra.MaximumNArgs(1), cobra.OnlyValidArgs),
-		ValidArgs: []string{"claude", "codex", "spark", "all"},
+		ValidArgs: []string{"claude", "codex", "all"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := "all"
 			if len(args) > 0 {
@@ -62,11 +63,11 @@ func runPing(parent context.Context, out io.Writer, text cliText, p provider.Pro
 		return err
 	}
 	if dryRun {
-		fmt.Fprintf(out, text.pingWouldRunFmt, name, dry.Command)
+		fmt.Fprintf(out, text.pingWouldRunFmt, name, commandLine(text, dry))
 		return nil
 	}
 
-	fmt.Fprintf(out, "%-7s → %s\n", name, dry.Command)
+	fmt.Fprintf(out, "%-7s → %s\n", name, commandLine(text, dry))
 
 	ctx, cancel := context.WithTimeout(parent, 3*time.Minute)
 	defer cancel()
@@ -104,6 +105,17 @@ func runPing(parent context.Context, out io.Writer, text cliText, p provider.Pro
 			i++
 		}
 	}
+}
+
+// commandLine renders the command to be run, naming the model when the command
+// itself doesn't. limitping only passes -m/--model when one is configured; with
+// it unset the CLI picks the model, and the bare command would leave the user
+// unable to tell which model the ping just spent quota on.
+func commandLine(text cliText, res *provider.TriggerResult) string {
+	if res.Model == "" || strings.Contains(res.Command, res.Model) {
+		return res.Command
+	}
+	return res.Command + fmt.Sprintf(text.pingModelFmt, res.Model)
 }
 
 func report(out io.Writer, text cliText, name string, start time.Time, res *provider.TriggerResult, err error) {

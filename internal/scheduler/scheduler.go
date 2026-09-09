@@ -246,7 +246,7 @@ func (s *Scheduler) runTarget(ctx context.Context, t Target) {
 				backoff = nextBackoff(backoff)
 				continue
 			}
-			s.log.Printf("[%s] DRY-RUN would ping now: %s", name, res.Command)
+			s.log.Printf("[%s] DRY-RUN would ping now: %s%s", name, res.Command, triggerModel(res))
 			// In dry-run we can't actually start a window, so estimate the next
 			// cycle from the configured window length to keep the loop sane.
 			// Sleep immediately instead of doing an extra usage read that cannot
@@ -270,7 +270,7 @@ func (s *Scheduler) runTarget(ctx context.Context, t Target) {
 			continue
 		}
 		lastPingAt = time.Now()
-		s.log.Printf("[%s] ping sent, new window started%s", name, triggerCost(res))
+		s.log.Printf("[%s] ping sent, new window started%s%s", name, triggerModel(res), triggerCost(res))
 		s.live.set(name, "ping sent — checking window soon", lastPingAt.Add(postPingGrace))
 		s.notify(name+": window started", "New 5h window"+triggerCost(res))
 
@@ -325,6 +325,16 @@ func (s *Scheduler) notify(title, msg string) {
 
 // triggerCost renders the token/cost tail for logs, e.g.
 // " — 32934 tok (in 32792 / out 142), $0.0110".
+// triggerModel names the model a ping used. The watch log is the only record an
+// unattended run leaves behind, and the command line names the model only when
+// limitping passed one explicitly.
+func triggerModel(res *provider.TriggerResult) string {
+	if res == nil || res.Model == "" {
+		return ""
+	}
+	return fmt.Sprintf(" (model: %s)", res.Model)
+}
+
 func triggerCost(res *provider.TriggerResult) string {
 	if res == nil || !res.HasUsage {
 		return ""

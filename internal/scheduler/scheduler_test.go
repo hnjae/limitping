@@ -396,6 +396,21 @@ func TestWindowLen(t *testing.T) {
 	}
 }
 
+// The watch log is the only record an unattended run leaves, so a ping has to
+// say which model it spent quota on.
+func TestTriggerModel(t *testing.T) {
+	if got := triggerModel(nil); got != "" {
+		t.Fatalf("triggerModel(nil) = %q", got)
+	}
+	if got := triggerModel(&provider.TriggerResult{}); got != "" {
+		t.Fatalf("triggerModel(unresolved) = %q, want empty", got)
+	}
+	res := &provider.TriggerResult{Model: "gpt-5.6-sol"}
+	if got, want := triggerModel(res), " (model: gpt-5.6-sol)"; got != want {
+		t.Fatalf("triggerModel = %q, want %q", got, want)
+	}
+}
+
 func TestTriggerCost(t *testing.T) {
 	if got := triggerCost(nil); got != "" {
 		t.Fatalf("triggerCost(nil) = %q", got)

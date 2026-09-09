@@ -7,6 +7,36 @@ through GitHub Actions and GoReleaser.
 
 ## Unreleased
 
+- **Fixed: a Codex ping could report success without starting a window.** Two
+  independent causes, each of which left the prompt unsubmitted while the
+  session still exited cleanly, so the ping read as successful and `watch` then
+  sat out a full window before retrying. The pseudo-terminal was created at 0x0
+  — Claude Code tolerates that, but the Codex TUI renders nothing into a
+  zero-sized viewport and simply waits forever. And with any hook unreviewed,
+  the TUI opens on a blocking "Hooks need review" prompt. Pings now allocate a
+  sized PTY and run with `--disable hooks`, which also stops a synthetic ping
+  session from firing the user's hooks.
+
+- **Breaking:** removed the Spark provider. OpenAI retired the model and the
+  usage endpoint now returns `additional_rate_limits: null`, so every Spark
+  `status`/`ping`/`watch` had started failing outright. `[spark]` in an existing
+  config is ignored; naming `spark` on the command line is now rejected.
+- `ping` and the `watch` log now name the model a ping ran on. With `model`
+  unset, limitping passes no `-m` and the command line named no model at all,
+  so there was no way to tell what a ping had spent quota on; the effective
+  model is now resolved from the provider CLI's own config and reported.
+- `[codex] model` now defaults to empty, meaning limitping picks the cheapest
+  model the plan offers by reading the Codex CLI's own catalog at ping time. A
+  ping only has to be billable, so it should never ride on the working model set
+  in the Codex CLI, which is typically a much pricier tier — and resolving per
+  ping means no model name in this repo can go stale again, which is what broke
+  when OpenAI retired `gpt-5.4-mini`. The pick is the budget tier OpenAI marks
+  "Fast and affordable"; when no catalog is readable or nothing in it is
+  recognizably that tier, the CLI chooses as before.
+- A model pinned in the config is now validated against that same catalog.
+  `codex -m` is not checked locally, so a retired model used to surface only as
+  an opaque server error at window rollover; it is now rejected up front with
+  the list of models the plan actually offers.
 - Every command now also answers to `lp`: the installer symlinks it next to
   `limitping`, usage lines and help examples echo back whichever name was typed,
   and `uninstall` removes the link. Install and uninstall both check ownership
