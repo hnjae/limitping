@@ -156,7 +156,7 @@ type cliText struct {
 	updateOptionUpgrade     string // the upgrade command to run
 	updateOptionSkip        string
 	updateOptionSkipVersion string
-	updateChoosePrompt      string
+	updateChooseHint        string // keys that drive the option menu
 	updateDismissedFmt      string // version
 	updateFailedFmt         string // error
 
@@ -454,10 +454,10 @@ Examples:
 
 	updateAvailableFmt:      "\n\u2728 Update available!  %s -> %s\n",
 	updateNotesFmt:          "   Release notes: %s\n\n",
-	updateOptionUpgrade:     "   1. Update now (runs `%s`)\n",
-	updateOptionSkip:        "   2. Skip\n",
-	updateOptionSkipVersion: "   3. Skip until next version\n",
-	updateChoosePrompt:      "\n   Choose [1-3, default 2]: ",
+	updateOptionUpgrade:     "Update now (runs `%s`)",
+	updateOptionSkip:        "Skip",
+	updateOptionSkipVersion: "Skip until next version",
+	updateChooseHint:        "\u2191/\u2193 move \u00b7 Enter confirm \u00b7 Esc skip",
 	updateDismissedFmt:      "   Skipping %s; you'll hear about the next release.\n",
 	updateFailedFmt:         "   %v\n",
 	upgradeShort:            "Upgrade limitping to the latest release",
@@ -729,10 +729,10 @@ Claude Code 会自动加载钩子；Codex 需要一次性信任：在 Codex 中�
 
 	updateAvailableFmt:      "\n\u2728 有新版本!  %s -> %s\n",
 	updateNotesFmt:          "   更新说明: %s\n\n",
-	updateOptionUpgrade:     "   1. 立即更新 (执行 `%s`)\n",
-	updateOptionSkip:        "   2. 跳过\n",
-	updateOptionSkipVersion: "   3. 跳过此版本\n",
-	updateChoosePrompt:      "\n   请选择 [1-3, 默认 2]: ",
+	updateOptionUpgrade:     "立即更新 (执行 `%s`)",
+	updateOptionSkip:        "跳过",
+	updateOptionSkipVersion: "跳过此版本",
+	updateChooseHint:        "\u2191/\u2193 移动 \u00b7 Enter 确认 \u00b7 Esc 跳过",
 	updateDismissedFmt:      "   已跳过 %s，下个版本会再提醒。\n",
 	updateFailedFmt:         "   %v\n",
 	upgradeShort:            "将 limitping 更新到最新版本",

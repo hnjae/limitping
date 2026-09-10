@@ -63,6 +63,58 @@ func TestPromptUpdateSkipUntilNextVersionRecordsTheDismissal(t *testing.T) {
 	}
 }
 
+// The menu is driven the way the provider CLIs drive theirs — arrow keys and
+// Enter — rather than by typing a number and pressing return.
+func TestPromptUpdateMovesWithTheArrowKeys(t *testing.T) {
+	setLocale(t, "C")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	// The cursor starts on Skip, so one press of Down lands on the third
+	// option, and Enter takes it.
+	var out bytes.Buffer
+	promptUpdate(&out, localizedText(), strings.NewReader("\x1b[B\r"), "0.10.0")
+	if got := update.Load().DismissedVersion; got != "0.10.0" {
+		t.Fatalf("down+Enter dismissed %q, want 0.10.0", got)
+	}
+	if got := out.String(); !strings.Contains(got, "Enter confirm") {
+		t.Fatalf("prompt does not say which keys drive it:\n%s", got)
+	}
+
+	// Wrapping past the top reaches the same option from the other side, and
+	// application-cursor mode (SS3) has to decode as well as CSI does.
+	for _, keys := range []string{"\x1b[A\x1b[A\r", "\x1bOB\r"} {
+		if err := update.Save(update.State{}); err != nil {
+			t.Fatal(err)
+		}
+		out.Reset()
+		promptUpdate(&out, localizedText(), strings.NewReader(keys), "0.10.0")
+		if got := update.Load().DismissedVersion; got != "0.10.0" {
+			t.Fatalf("keys %q dismissed %q, want 0.10.0", keys, got)
+		}
+	}
+}
+
+// Whatever reads as "get out of my way" has to land on the option that changes
+// nothing, since this notice interrupts a command the user actually asked for.
+func TestPromptUpdateEscapeAndCtrlCSkip(t *testing.T) {
+	setLocale(t, "C")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	for name, keys := range map[string]string{
+		"esc":    "\x1b",
+		"ctrl-c": "\x03",
+		"ctrl-d": "\x04",
+		// A stray Esc while the cursor sits elsewhere still means skip.
+		"moved then esc": "\x1b[B\x1b",
+	} {
+		var out bytes.Buffer
+		promptUpdate(&out, localizedText(), strings.NewReader(keys), "0.10.0")
+		if got := update.Load().DismissedVersion; got != "" {
+			t.Fatalf("%s dismissed %q, want nothing recorded", name, got)
+		}
+	}
+}
+
 func TestPromptUpdateIsLocalized(t *testing.T) {
 	setLocale(t, "zh_CN.UTF-8")
 	var out bytes.Buffer
