@@ -23,7 +23,7 @@ Claude Code 和 Codex 的订阅限额按 **5 小时滚动窗口**(外加周限�
 
 ```
 claude  ✓ pinged (6.6s)
-codex   ✓ pinged (13.6s)
+codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 ```
 
 ## 亮点
@@ -65,7 +65,7 @@ limitping bg logs -f
 | Provider | 读取用量(零消耗) | 触发方式 | 鉴权 |
 |---|---|---|---|
 | **Claude Code** | `…/api/oauth/usage` | 交互式 Claude Code CLI | OAuth(钥匙串 / `~/.claude`) |
-| **Codex** | `…/backend-api/wham/usage` | 交互式 Codex CLI | OAuth(`~/.codex/auth.json`) |
+| **Codex** | `…/backend-api/wham/usage` | `codex exec --ephemeral` | OAuth(`~/.codex/auth.json`) |
 
 ## 工作原理
 
@@ -73,7 +73,7 @@ limitping bg logs -f
 
 | 任务 | 机制 | 代价 |
 |------|------|------|
-| **触发**新窗口 | 官方交互式 CLI(Claude Code / Codex) | 消耗一点额度(这正是功能本身) |
+| **触发**新窗口 | 官方 CLI(交互式 Claude Code / headless `codex exec`) | 消耗一点额度(这正是功能本身) |
 | **读取**用量与重置时刻 | 零消耗用量端点(和 CodexBar / 社区插件用的是同一批) | 不消耗,也绝不会起算窗口 |
 
 当 `watch` 发现 5h 窗口已经重置时,会先检查是否有 Claude/Codex 会话正处于对话进行中。
@@ -88,11 +88,14 @@ limitping bg logs -f
   429,limitping 会调用免费且不创建 Message 的 token-counting 端点,区分真实的
   端点限流与 Claude Code 订阅访问被禁用。
 - **Codex**:用 `~/.codex/auth.json` 里的 OAuth token,读
-  `GET https://chatgpt.com/backend-api/wham/usage`。触发使用带 TTY 的交互式
-  `codex "<prompt>"` 会话;headless `codex exec` 可能会消耗 token,但不一定起算
-  Codex 订阅窗口。ping 会带上 `--disable hooks` 并分配一个有尺寸的伪终端:你的钩子
-  没理由为一个合成会话运行,而且只要有钩子未经审阅,TUI 就会停在一个阻塞的信任提示上;
-  终端尺寸为 0 时 TUI 更是什么都不渲染 —— 两种情况下 prompt 都不会被提交。
+  `GET https://chatgpt.com/backend-api/wham/usage`。触发执行
+  `codex exec --ephemeral --json "<prompt>"`。ping 之所以走 headless,就是为了
+  `--ephemeral`:交互式 CLI 没有办法不落盘会话,所以以前每次 ping 都会在
+  `codex resume` 和 Codex Desktop 的对话列表里留下一条 `ok` 会话。`--json` 让 ping
+  可验证 —— 它的 `turn.completed` 事件是本地唯一能证明「确实发出了一次计费请求」的
+  依据,报告里的 token 数和费用也来自这里。ping 同时带 `--disable hooks` 和
+  `--sandbox read-only`:钩子没理由为一个合成会话触发(它也不该把自己登记成活跃的
+  Codex 会话),而且这条路径上没有人审阅模型的动作 —— 交互式会话有你在键盘前,它没有。
 
 Claude/Codex 的 token 直接复用官方工具(无需另外登录),遇到 401 会自动刷新。
 
@@ -227,14 +230,15 @@ limitping uninstall            # 删除 limitping 以及配置/缓存(简称: rm
 | `upgrade` | `up`、`update` |
 | `uninstall` | `rm`、`remove` |
 
-`ping` 会显示具体命令和实时计时(终端下是 spinner)。当前 Claude/Codex 都用交互式
-触发,CLI 不提供可靠的逐次 machine-readable token/费用数据,所以成功输出通常只显示耗时:
+`ping` 会显示具体命令和实时计时(终端下是 spinner)。Codex 的 ping 会报告这一轮的
+token 数和等价 API 费用,数据来自 `codex exec --json`;Claude 仍用交互式触发,CLI 不
+提供可靠的逐次 machine-readable 用量,所以只显示耗时:
 
 ```
 claude  → claude --model haiku .
 claude  ✓ pinged (6.6s)
-codex   → codex --disable hooks -c model_reasoning_effort=low -m gpt-5.6-luna ok
-codex   ✓ pinged (13.6s)
+codex   → codex exec --ephemeral --json --skip-git-repo-check --disable hooks --sandbox read-only -c model_reasoning_effort=low -m gpt-5.6-luna ok
+codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 ```
 
 `ping` 和 `watch` 日志始终会显示模型。极少数情况下 limitping 选不出来(磁盘上没有模型
@@ -242,7 +246,7 @@ codex   ✓ pinged (13.6s)
 这样仍然能看清这次 ping 消耗在哪个模型上:
 
 ```
-codex   → codex --disable hooks -c model_reasoning_effort=low ok  (模型: gpt-5.6-sol)
+codex   → codex exec --ephemeral --json … -c model_reasoning_effort=low ok  (模型: gpt-5.6-sol)
 ```
 
 ping 后请用 `status` 或 `bg status` 查看权威的 5h/周窗口状态。

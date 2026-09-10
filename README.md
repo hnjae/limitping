@@ -27,7 +27,7 @@ after the terminal closes.
 
 ```
 claude  ✓ pinged (6.6s)
-codex   ✓ pinged (13.6s)
+codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 ```
 
 ## Highlights
@@ -75,7 +75,7 @@ provider quota: `limitping ping --dry-run`, `limitping watch --dry-run`, or
 | Provider | Read usage (zero-quota) | Trigger | Auth |
 |---|---|---|---|
 | **Claude Code** | `…/api/oauth/usage` | interactive Claude Code CLI | OAuth (Keychain / `~/.claude`) |
-| **Codex** | `…/backend-api/wham/usage` | interactive Codex CLI | OAuth (`~/.codex/auth.json`) |
+| **Codex** | `…/backend-api/wham/usage` | `codex exec --ephemeral` | OAuth (`~/.codex/auth.json`) |
 
 ## How it works
 
@@ -83,7 +83,7 @@ Two cleanly separated jobs:
 
 | Job | Mechanism | Cost |
 |-----|-----------|------|
-| **Trigger** a new window | the official interactive CLI (Claude Code / Codex) | a tiny slice of quota (this is the point) |
+| **Trigger** a new window | the official CLI (interactive Claude Code / headless `codex exec`) | a tiny slice of quota (this is the point) |
 | **Read** usage & reset times | zero-quota usage endpoints (the same ones CodexBar / community plugins use) | none — never starts a window |
 
 When `watch` sees a 5h window has reset, it first checks whether a Claude/Codex
@@ -104,13 +104,17 @@ the window resets.
   distinguish a real endpoint throttle from Claude Code subscription access
   being disabled.
 - **Codex**: reads `GET https://chatgpt.com/backend-api/wham/usage` using the
-  OAuth token from `~/.codex/auth.json`. Triggering uses a TTY-backed
-  interactive `codex "<prompt>"` session; headless `codex exec` can consume
-  tokens without anchoring the subscription-backed Codex window. The ping runs
-  with `--disable hooks` and a sized pseudo-terminal: your hooks have no
-  business running for a synthetic session, and an unreviewed one would open the
-  TUI on a blocking trust prompt, while a zero-sized terminal makes it render
-  nothing at all — either way the prompt is never submitted.
+  OAuth token from `~/.codex/auth.json`. Triggering runs
+  `codex exec --ephemeral --json "<prompt>"`. `--ephemeral` is the reason the
+  ping is headless: the interactive CLI cannot skip persisting a session, so
+  every ping used to leave an "ok" conversation behind in `codex resume` and in
+  the Codex Desktop thread list. `--json` makes the ping verifiable — its
+  `turn.completed` event is the only local proof that a billable request went
+  out, and it is where the reported token count and cost come from. The ping
+  also runs with `--disable hooks` and `--sandbox read-only`: your hooks have no
+  business firing for a synthetic session (it must not register itself as an
+  active Codex session either), and nothing reviews what the model does on this
+  path, unlike an interactive session with you at the keys.
 
 Claude/Codex tokens are reused from the official tools (no separate login) and
 refreshed on 401.
@@ -252,16 +256,16 @@ it collides with. (Building from source? `ln -s limitping /usr/local/bin/lmp`.)
 | `upgrade` | `up`, `update` |
 | `uninstall` | `rm`, `remove` |
 
-`ping` shows the exact command and a live timer (a spinner on a terminal).
-Current Claude/Codex interactive trigger sessions do not expose reliable
-machine-readable per-ping token or cost data, so success output normally shows
-elapsed time only:
+`ping` shows the exact command and a live timer (a spinner on a terminal). The
+Codex ping reports the turn's tokens and an equivalent API cost, read from
+`codex exec --json`; Claude's interactive trigger session exposes no reliable
+machine-readable per-ping usage, so it shows elapsed time only:
 
 ```
 claude  → claude --model haiku .
 claude  ✓ pinged (6.6s)
-codex   → codex --disable hooks -c model_reasoning_effort=low -m gpt-5.6-luna ok
-codex   ✓ pinged (13.6s)
+codex   → codex exec --ephemeral --json --skip-git-repo-check --disable hooks --sandbox read-only -c model_reasoning_effort=low -m gpt-5.6-luna ok
+codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 ```
 
 `ping` and the `watch` log always name the model. In the rare case limitping
@@ -270,7 +274,7 @@ Codex CLI chooses instead, and the model is reported alongside the command so
 you still see what the ping spent quota on:
 
 ```
-codex   → codex --disable hooks -c model_reasoning_effort=low ok  (model: gpt-5.6-sol)
+codex   → codex exec --ephemeral --json … -c model_reasoning_effort=low ok  (model: gpt-5.6-sol)
 ```
 
 Use `status` or `bg status` for the authoritative 5h/weekly window view after a

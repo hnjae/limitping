@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,11 +18,11 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	"github.com/creack/pty"
 
 	"github.com/wavever/CCLimitPing/internal/activity"
 	"github.com/wavever/CCLimitPing/internal/auth"
 	"github.com/wavever/CCLimitPing/internal/config"
+	"github.com/wavever/CCLimitPing/internal/pricing"
 	"github.com/wavever/CCLimitPing/internal/usage"
 )
 
@@ -38,23 +37,11 @@ const (
 	// codexRedeemCooldown throttles the automatic redemption path so a
 	// once-a-minute poll loop cannot re-attempt a refused redemption every cycle.
 	codexRedeemCooldown = 15 * time.Minute
-
-	// The PTY needs a plausible size for the Codex TUI to lay out and render at
-	// all; the exact numbers only have to be big enough to be a believable
-	// terminal, since nothing reads the rendering back.
-	codexPTYRows = 40
-	codexPTYCols = 120
-
-	codexTurnMinWait  = 4 * time.Second
-	codexTurnQuiet    = 2500 * time.Millisecond
-	codexTurnMaxWait  = 45 * time.Second
-	codexExitGrace    = 5 * time.Second
-	codexPollInterval = 200 * time.Millisecond
 )
 
 // Codex reads usage via the ChatGPT backend usage endpoint and triggers windows
-// via the interactive, TTY-backed Codex CLI. Headless `codex exec` can consume
-// tokens without anchoring the subscription-backed Codex window.
+// with a headless `codex exec --ephemeral` request, so a ping leaves no session
+// behind in the Codex thread list.
 type Codex struct {
 	cfg  config.ProviderConfig
 	auth *auth.CodexAuth
@@ -645,11 +632,24 @@ func triggerCodex(ctx context.Context, cfg config.ProviderConfig, dryRun bool) (
 	if prompt == "" {
 		prompt = "ok"
 	}
-	// A ping is a synthetic session, so the user's Codex hooks have no business
-	// running for it — and leaving them on is not merely untidy: an unreviewed
-	// hook makes the TUI open on a blocking "Hooks need review" prompt that no
-	// keystroke of ours answers, so the ping silently never submits anything.
-	args := []string{"--disable", "hooks"}
+	// --ephemeral is why the ping runs headless rather than through the TUI:
+	// the interactive CLI has no way to skip persisting a session, so every
+	// ping left an "ok" conversation behind in `codex resume` and in the Codex
+	// Desktop thread list. --json is what makes the ping checkable at all — the
+	// turn.completed event is the only local proof that a billable request went
+	// out, which is what starts the window.
+	//
+	// Hooks stay off because a ping is a synthetic session: the user's hooks
+	// have no business firing for it, and it must not register itself as an
+	// active Codex session. The sandbox is pinned read-only because nothing
+	// reviews what the model does here — unlike an interactive session, which
+	// has a human at the keys.
+	args := []string{
+		"exec", "--ephemeral", "--json",
+		"--skip-git-repo-check",
+		"--disable", "hooks",
+		"--sandbox", "read-only",
+	}
 	if cfg.ReasoningEffort != "" {
 		args = append(args, "-c", "model_reasoning_effort="+cfg.ReasoningEffort)
 	}
@@ -657,7 +657,7 @@ func triggerCodex(ctx context.Context, cfg config.ProviderConfig, dryRun bool) (
 	if model != "" {
 		args = append(args, "-m", model)
 	}
-	args = append(args, codexInteractiveArgs(cfg.ExtraArgs)...)
+	args = append(args, codexExecArgs(cfg.ExtraArgs)...)
 	args = append(args, prompt)
 	reported := model
 	if reported == "" {
@@ -678,129 +678,92 @@ func triggerCodex(ctx context.Context, cfg config.ProviderConfig, dryRun bool) (
 		return res, nil
 	}
 
+	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, "codex", args...)
-	// pty.Start would hand the child a 0x0 terminal. Claude Code tolerates that,
-	// but the Codex TUI draws nothing into a zero-sized viewport: it emits its
-	// terminal-capability queries and then sits there forever, so the prompt is
-	// never submitted, no request is dispatched, and the window never starts —
-	// while the session still exits cleanly and reads as a successful ping.
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: codexPTYRows, Cols: codexPTYCols})
-	if err != nil {
-		return res, fmt.Errorf("codex interactive failed to start: %w", err)
-	}
-	defer ptmx.Close()
-
-	output := &limitedBuffer{limit: 4096}
-	go func() {
-		_, _ = io.Copy(output, ptmx)
-	}()
-
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Wait()
-	}()
-
-	if terminal, err := codexAwait(ctx, cmd, ptmx, output, done, codexTurnMaxWait,
-		func(idle, elapsed time.Duration) bool {
-			return elapsed >= codexTurnMinWait && idle >= codexTurnQuiet
-		}); terminal {
-		return res, err
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	// Left nil so the child reads /dev/null: given a prompt argument and an
+	// open stdin, `codex exec` waits to append piped input to it.
+	cmd.Stdin = nil
+	if err := cmd.Run(); err != nil {
+		return res, fmt.Errorf("codex exec failed: %w: %s", err, codexExecTail(stderr, stdout))
 	}
 
-	return res, codexInteractiveStop(ctx, cmd, ptmx, done, output)
-}
-
-func codexAwait(ctx context.Context, cmd *exec.Cmd, ptmx *os.File, output *limitedBuffer, done <-chan error, maxWait time.Duration, ready func(idle, elapsed time.Duration) bool) (bool, error) {
-	start := time.Now()
-	deadline := time.After(maxWait)
-	ticker := time.NewTicker(codexPollInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case err := <-done:
-			return true, codexInteractiveErr(err, output)
-		case <-ctx.Done():
-			return true, codexInteractiveCancel(ctx, cmd, ptmx, done, output)
-		case <-deadline:
-			return false, nil
-		case <-ticker.C:
-			changed := output.changedAt()
-			if !changed.IsZero() && ready(time.Since(changed), time.Since(start)) {
-				return false, nil
-			}
+	cached, completed := codexExecUsage(stdout.Bytes(), res)
+	if !completed {
+		// A clean exit with no completed turn means nothing reached the model,
+		// so no window was started. This is the one outcome a ping must never
+		// report as success: watch would record it and then wait out a window
+		// that never began.
+		return res, fmt.Errorf("codex exec started no turn, so no window was started: %s",
+			codexExecTail(stderr, stdout))
+	}
+	// Codex doesn't report a USD cost; derive it from LiteLLM rates like
+	// CodexBar/ccusage do.
+	if reported != "" {
+		pctx, pcancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if price, ok := pricing.Default().Lookup(pctx, reported); ok {
+			res.CostUSD = price.Cost(res.InputTokens, cached, res.OutputTokens)
 		}
+		pcancel()
 	}
+	return res, nil
 }
 
-func codexInteractiveStop(ctx context.Context, cmd *exec.Cmd, ptmx *os.File, done <-chan error, output *limitedBuffer) error {
-	deadline := time.After(codexExitGrace)
-	ticker := time.NewTicker(codexExitGrace / 2)
-	defer ticker.Stop()
-
-	for sent := false; ; {
-		if !sent {
-			_, _ = ptmx.Write([]byte{0x03})
-			sent = true
+// codexExecUsage reads the turn's token usage out of `codex exec --json`
+// output, which is JSONL whose final turn.completed event carries the totals.
+// output_tokens already includes reasoning tokens, so they are not added again.
+// It reports whether a completed turn was seen at all — the ping's only local
+// evidence that a billable request was dispatched.
+func codexExecUsage(out []byte, res *TriggerResult) (cachedInput int, completed bool) {
+	for _, line := range bytes.Split(out, []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
 		}
-		select {
-		case <-done:
-			return nil
-		case <-ctx.Done():
-			return codexInteractiveCancel(ctx, cmd, ptmx, done, output)
-		case <-ticker.C:
-			_, _ = ptmx.Write([]byte{0x03})
-		case <-deadline:
-			if cmd.Process != nil {
-				_ = cmd.Process.Kill()
-			}
-			select {
-			case <-done:
-			case <-time.After(time.Second):
-			}
-			return nil
+		var ev struct {
+			Type  string `json:"type"`
+			Usage *struct {
+				InputTokens       int `json:"input_tokens"`
+				CachedInputTokens int `json:"cached_input_tokens"`
+				OutputTokens      int `json:"output_tokens"`
+			} `json:"usage"`
 		}
+		if err := json.Unmarshal(line, &ev); err != nil || ev.Type != "turn.completed" || ev.Usage == nil {
+			continue
+		}
+		res.InputTokens = ev.Usage.InputTokens
+		res.OutputTokens = ev.Usage.OutputTokens
+		res.TotalTokens = res.InputTokens + res.OutputTokens
+		res.HasUsage = true
+		cachedInput, completed = ev.Usage.CachedInputTokens, true
 	}
+	return cachedInput, completed
 }
 
-func codexInteractiveErr(err error, output *limitedBuffer) error {
-	if err == nil {
-		return nil
+// codexExecTail renders whatever the CLI said, preferring stderr: with --json,
+// stdout is an event stream and the human-readable failure lands on stderr.
+func codexExecTail(stderr, stdout bytes.Buffer) string {
+	if tail := truncate(stderr.Bytes(), 300); tail != "" {
+		return tail
 	}
-	tail := truncate(output.Bytes(), 300)
-	if tail == "" {
-		return fmt.Errorf("codex interactive failed: %w", err)
-	}
-	return fmt.Errorf("codex interactive failed: %w: %s", err, tail)
+	return truncate(stdout.Bytes(), 300)
 }
 
-func codexInteractiveCancel(ctx context.Context, cmd *exec.Cmd, ptmx *os.File, done <-chan error, output *limitedBuffer) error {
-	if cmd.Process != nil {
-		_ = cmd.Process.Kill()
-	}
-	_ = ptmx.Close()
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-	}
-	tail := truncate(output.Bytes(), 300)
-	if tail == "" {
-		return fmt.Errorf("codex interactive cancelled: %w", ctx.Err())
-	}
-	return fmt.Errorf("codex interactive cancelled: %w: %s", ctx.Err(), tail)
-}
-
-func codexInteractiveArgs(extra []string) []string {
+// codexExecArgs drops the flags that exist only on the interactive CLI, so an
+// extra_args list carried over from when the ping ran through the TUI cannot
+// make `codex exec` reject the entire command line.
+func codexExecArgs(extra []string) []string {
 	out := make([]string, 0, len(extra))
 	for i := 0; i < len(extra); i++ {
 		arg := extra[i]
 		flag, inlineValue := splitFlagValue(arg)
-		if codexInteractiveUnsupportedValueArg(flag) {
+		if codexExecUnsupportedValueArg(flag) {
 			if !inlineValue && i+1 < len(extra) {
 				i++
 			}
 			continue
 		}
-		if codexInteractiveUnsupportedArg(flag) {
+		if codexExecUnsupportedArg(flag) {
 			continue
 		}
 		out = append(out, arg)
@@ -808,18 +771,18 @@ func codexInteractiveArgs(extra []string) []string {
 	return out
 }
 
-func codexInteractiveUnsupportedArg(flag string) bool {
+func codexExecUnsupportedArg(flag string) bool {
 	switch flag {
-	case "--skip-git-repo-check", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--json":
+	case "--no-alt-screen":
 		return true
 	default:
 		return false
 	}
 }
 
-func codexInteractiveUnsupportedValueArg(flag string) bool {
+func codexExecUnsupportedValueArg(flag string) bool {
 	switch flag {
-	case "--output-schema", "--output-last-message", "--color", "-o":
+	case "--remote", "--remote-auth-token-env":
 		return true
 	default:
 		return false

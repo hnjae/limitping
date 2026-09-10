@@ -231,17 +231,15 @@ chatgpt_base_url = "https://api.openai.com"
 	}
 }
 
-func TestCodexTriggerDryRunUsesInteractiveCommand(t *testing.T) {
+func TestCodexTriggerDryRunUsesEphemeralExecCommand(t *testing.T) {
 	c := NewCodex(config.ProviderConfig{
 		Prompt:          "ok",
 		Model:           "gpt-5.6-luna",
 		ReasoningEffort: "low",
 		ExtraArgs: []string{
-			"--skip-git-repo-check",
-			"--json",
-			"--output-schema", "schema.json",
+			"--no-alt-screen",
 			"--search",
-			"--sandbox", "read-only",
+			"--sandbox", "danger-full-access",
 		},
 	})
 
@@ -249,31 +247,65 @@ func TestCodexTriggerDryRunUsesInteractiveCommand(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dry-run trigger: %v", err)
 	}
-	want := "codex --disable hooks -c model_reasoning_effort=low -m gpt-5.6-luna --search --sandbox read-only ok"
+	want := "codex exec --ephemeral --json --skip-git-repo-check --disable hooks --sandbox read-only " +
+		"-c model_reasoning_effort=low -m gpt-5.6-luna --search --sandbox danger-full-access ok"
 	if res.Command != want {
 		t.Fatalf("command = %q, want %q", res.Command, want)
 	}
-	if strings.Contains(res.Command, "exec") || strings.Contains(res.Command, "--json") {
-		t.Fatalf("command still uses headless mode: %q", res.Command)
+}
+
+// --ephemeral is the whole point of the headless path: without it every ping
+// leaves an "ok" conversation in `codex resume` and the Codex Desktop thread
+// list, and the interactive CLI has no equivalent flag at all.
+func TestCodexTriggerNeverPersistsThePingSession(t *testing.T) {
+	fakeCodexHome(t)
+	res, err := NewCodex(config.ProviderConfig{Prompt: "ok"}).Trigger(context.Background(), true)
+	if err != nil {
+		t.Fatalf("dry-run trigger: %v", err)
+	}
+	for _, want := range []string{"exec", "--ephemeral", "--json"} {
+		if !strings.Contains(res.Command, want) {
+			t.Fatalf("command = %q, want it to carry %q", res.Command, want)
+		}
 	}
 }
 
-func TestCodexInteractiveArgsDropsExecOnlyFlags(t *testing.T) {
-	got := codexInteractiveArgs([]string{
-		"--skip-git-repo-check",
-		"--ephemeral",
-		"--ignore-user-config",
-		"--ignore-rules",
-		"--json",
-		"--output-schema=schema.json",
-		"--output-last-message", "out.txt",
-		"--color", "never",
+func TestCodexExecArgsDropsInteractiveOnlyFlags(t *testing.T) {
+	got := codexExecArgs([]string{
+		"--no-alt-screen",
+		"--remote", "ws://localhost:1234",
+		"--remote-auth-token-env=TOKEN",
 		"--search",
 		"-C", "/tmp/project",
 	})
 	want := []string{"--search", "-C", "/tmp/project"}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("interactive args = %#v, want %#v", got, want)
+		t.Fatalf("exec args = %#v, want %#v", got, want)
+	}
+}
+
+// The failure this path must never hide: the CLI exits 0 but no turn ran, so
+// nothing was billed and no window started. Reporting that as a successful
+// ping is what makes watch wait out a window that never began.
+func TestCodexExecUsageRequiresACompletedTurn(t *testing.T) {
+	var res TriggerResult
+	if _, completed := codexExecUsage([]byte(`{"type":"thread.started","thread_id":"t"}
+{"type":"turn.started"}
+`), &res); completed {
+		t.Fatal("a stream without turn.completed must not read as a dispatched request")
+	}
+	if res.HasUsage {
+		t.Fatalf("usage = %+v, want none reported", res)
+	}
+
+	cached, completed := codexExecUsage([]byte(`{"type":"thread.started","thread_id":"t"}
+{"type":"turn.completed","usage":{"input_tokens":19544,"cached_input_tokens":8960,"output_tokens":15,"reasoning_output_tokens":0}}
+`), &res)
+	if !completed || !res.HasUsage {
+		t.Fatalf("completed=%t usage=%+v, want a dispatched request", completed, res)
+	}
+	if res.InputTokens != 19544 || res.OutputTokens != 15 || res.TotalTokens != 19559 || cached != 8960 {
+		t.Fatalf("usage = %+v (cached %d), want 19544 in / 15 out / 8960 cached", res, cached)
 	}
 }
 
@@ -622,24 +654,19 @@ func writeCodexCLIConfig(t *testing.T, contents string) {
 	}
 }
 
-// Both halves of the silent-no-op bug: with an unreviewed hook the Codex TUI
-// opens on a blocking trust prompt, and a zero-sized PTY makes it render
-// nothing at all. Either way the prompt is never submitted, no request is
-// dispatched, the 5h window never starts — and the session still exits cleanly,
-// so the ping reported success.
-func TestCodexTriggerDisablesHooksSoTheTUIDoesNotBlockOnTrust(t *testing.T) {
+// A ping is a synthetic session: the user's hooks must not fire for it (which
+// would also mark it as an active Codex session), and nothing reviews what the
+// model does on this path, so it must not inherit a permissive sandbox from the
+// user's Codex config.
+func TestCodexTriggerRunsTheSyntheticSessionWithoutHooksOrWriteAccess(t *testing.T) {
 	fakeCodexHome(t)
 	res, err := NewCodex(config.ProviderConfig{Prompt: "ok"}).Trigger(context.Background(), true)
 	if err != nil {
 		t.Fatalf("dry-run trigger: %v", err)
 	}
-	if !strings.HasPrefix(res.Command, "codex --disable hooks ") {
-		t.Fatalf("command = %q, want hooks disabled for the ping session", res.Command)
-	}
-}
-
-func TestCodexPTYSizeIsANonZeroTerminal(t *testing.T) {
-	if codexPTYRows == 0 || codexPTYCols == 0 {
-		t.Fatal("the Codex TUI renders nothing into a zero-sized viewport")
+	for _, want := range []string{"--disable hooks", "--sandbox read-only"} {
+		if !strings.Contains(res.Command, want) {
+			t.Fatalf("command = %q, want it to carry %q", res.Command, want)
+		}
 	}
 }
