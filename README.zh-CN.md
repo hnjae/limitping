@@ -249,7 +249,9 @@ codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 codex   → codex exec --ephemeral --json … -c model_reasoning_effort=low ok  (模型: gpt-5.6-sol)
 ```
 
-ping 后请用 `status` 或 `bg status` 查看权威的 5h/周窗口状态。
+ping 结束时会把被 ping 的 Provider 的窗口状态一并打印出来(和 `status` 相同)——
+一次 ping 远远不足以让用量百分比变动,所以它自己的输出说明不了窗口有没有起算。读取
+用量不消耗额度,也不会起算窗口。`--dry-run` 不会读:什么都没发出去,就没有新状态可报。
 
 `status` 示例:
 

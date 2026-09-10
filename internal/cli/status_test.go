@@ -270,7 +270,7 @@ func (f fakeStatusProvider) ReadUsage(context.Context) (*usage.Usage, error) {
 }
 
 func (f fakeStatusProvider) Trigger(context.Context, bool) (*provider.TriggerResult, error) {
-	return nil, nil
+	return &provider.TriggerResult{Command: f.name + " ok"}, nil
 }
 
 func TestFmtZoneRendersOffsetNotAbbreviation(t *testing.T) {

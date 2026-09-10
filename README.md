@@ -277,8 +277,11 @@ you still see what the ping spent quota on:
 codex   → codex exec --ephemeral --json … -c model_reasoning_effort=low ok  (model: gpt-5.6-sol)
 ```
 
-Use `status` or `bg status` for the authoritative 5h/weekly window view after a
-ping.
+A ping ends by printing the same window view `status` gives, for the providers
+it pinged — a ping is far too small to move the used percentage, so its own
+output cannot show whether a window started. Reading usage costs nothing and
+never starts a window. `--dry-run` skips it: nothing was sent, so there is no
+new state to report.
 
 Example `status`:
 

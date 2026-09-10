@@ -38,19 +38,35 @@ func newPingCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out := cmd.OutOrStdout()
-			tty := isTerminal(os.Stdout)
-			var firstErr error
-			for _, p := range providers {
-				if err := runPing(cmd.Context(), out, text, p, dryRun, tty); err != nil && firstErr == nil {
-					firstErr = err
-				}
-			}
-			return firstErr
+			return runPings(cmd.Context(), cmd.OutOrStdout(), text, providers,
+				dryRun, isTerminal(os.Stdout), cfg.UsageDisplay)
 		},
 	}
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, text.pingDryRunFlag)
 	return cmd
+}
+
+// runPings triggers each provider and then reports the window state the pings
+// were meant to change. Reading usage is free and never starts a window, and
+// without it the command only answers "the request went out" while the question
+// actually being asked is "did my window start" — which the ping's own output
+// cannot show, because a ping is far too small to move the used percentage.
+func runPings(ctx context.Context, out io.Writer, text cliText, providers []provider.Provider, dryRun, tty bool, display string) error {
+	var firstErr error
+	for _, p := range providers {
+		if err := runPing(ctx, out, text, p, dryRun, tty); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	if dryRun {
+		return firstErr // nothing was sent, so there is no new state to report
+	}
+	fmt.Fprintln(out)
+	// Reported even when a ping failed: that is exactly when the window state
+	// is worth seeing. A failing status read is printed inline by runStatus and
+	// must not turn a successful ping into a failed command.
+	_ = runStatus(ctx, out, io.Discard, text, providers, false, false, display)
+	return firstErr
 }
 
 // runPing triggers one provider with live feedback so the user can see what the

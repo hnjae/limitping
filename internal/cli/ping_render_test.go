@@ -1,11 +1,68 @@
 package cli
 
 import (
+	"bytes"
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wavever/CCLimitPing/internal/provider"
+	"github.com/wavever/CCLimitPing/internal/usage"
 )
+
+// A ping's own output cannot answer the question it is run to answer: a ping is
+// too small to move the used percentage, so the window state has to be read
+// back from the provider afterwards.
+func TestRunPingsReportsTheWindowStateAfterward(t *testing.T) {
+	setLocale(t, "C")
+	text := localizedText()
+	p := fakeStatusProvider{
+		name: "codex",
+		usage: &usage.Usage{
+			Provider:  "codex",
+			Plan:      "plus",
+			FiveHour:  usage.Window{ResetsAt: time.Now().Add(5 * time.Hour), WindowSeconds: 18000},
+			FetchedAt: time.Now(),
+		},
+	}
+
+	var out bytes.Buffer
+	if err := runPings(context.Background(), &out, text, []provider.Provider{p}, false, false, "used"); err != nil {
+		t.Fatalf("runPings() error = %v", err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "✓ pinged") {
+		t.Fatalf("output = %q, want the ping result", got)
+	}
+	if !strings.Contains(got, "codex (plus)") || !strings.Contains(got, "5h") {
+		t.Fatalf("output = %q, want the window state after the ping", got)
+	}
+}
+
+// A dry run sends nothing, so there is no new state to read back — and reading
+// it would suggest the window was touched.
+func TestRunPingsDryRunReportsNoWindowState(t *testing.T) {
+	setLocale(t, "C")
+	text := localizedText()
+	read := 0
+	p := fakeStatusProvider{
+		name:   "codex",
+		usage:  &usage.Usage{Provider: "codex"},
+		onRead: func() { read++ },
+	}
+
+	var out bytes.Buffer
+	if err := runPings(context.Background(), &out, text, []provider.Provider{p}, true, false, "used"); err != nil {
+		t.Fatalf("runPings() error = %v", err)
+	}
+	if read != 0 {
+		t.Fatalf("usage reads = %d, want none for a dry run", read)
+	}
+	if !strings.Contains(out.String(), "would run") {
+		t.Fatalf("output = %q, want the dry-run command", out.String())
+	}
+}
 
 func TestCommandLineNamesTheModelOnlyWhenTheCommandDoesNot(t *testing.T) {
 	setLocale(t, "C")
