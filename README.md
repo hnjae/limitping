@@ -37,6 +37,8 @@ codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
   `bg start` with `bg status`, `bg logs -f`, and `bg stop`.
 - Shows 5h and weekly usage, reset countdowns, and background watcher state from
   read-only usage endpoints.
+- Counts today's tokens and what they would have cost at API rates, read from the
+  CLIs' own local session transcripts — the number the percentages never show.
 - Triggers Claude Code and Codex through their official CLIs using your existing
   logged-in credentials.
 - Detects active Claude/Codex turns via CLI hooks, so a ping never interrupts a
@@ -203,9 +205,9 @@ logged in.
 
 ```sh
 limitping config init          # write ~/.config/limitping/config.toml
-limitping status               # show 5h/weekly % + reset countdowns (alias: s)
+limitping status               # 5h/weekly % + reset countdowns + today's tokens (alias: s)
 limitping status --json        # machine-readable JSON for each provider
-limitping status -v            # also print raw JSON
+limitping status -v            # also print the per-model breakdown and raw JSON
 limitping ping                 # trigger all enabled providers now (alias: p)
 limitping ping claude          # Claude only
 limitping ping codex           # Codex only
@@ -295,10 +297,12 @@ Example `status`:
 claude
   5h     [█████░░░░░]  51.0% used      resets in 3h14m    (Sun 00:10 UTC+8)
   weekly [█████░░░░░]  54.0% used      resets in 7h04m    (Sun 04:00 UTC+8)
+  today  55.0M tok  ≈ $41.03
 
 codex (plus)
   5h     [██░░░░░░░░]  24.0% used      resets in 3h15m    (Sun 00:11 UTC+8)
   weekly [████░░░░░░]  37.0% used      resets in 111h57m  (Thu 12:53 UTC+8)
+  today  20.5M tok  ≈ $10.06
   reset credits 1 reset available
     - available, granted Jun 17 17:38, expires Jul 17 17:38 UTC+8 (in 24d6h)
 ```
@@ -306,11 +310,46 @@ codex (plus)
 Text status defaults to **used** percentage. Set `usage_display = "remaining"` if
 you prefer the same mental model as Codex's "Usage remaining" UI.
 
+### Today's tokens and cost
+
+The `today` line answers what the percentages cannot: how much this machine
+actually consumed since local midnight, and what that would have cost at
+published API rates — the value a subscription is returning. The usage endpoints
+only ever report percentages, so the tokens are totalled from the transcripts
+the CLIs already write to disk (`~/.claude/projects`, `~/.codex/sessions` —
+honoring `$CLAUDE_CONFIG_DIR` / `$CODEX_HOME`), the same source ccusage and
+CodexBar read, and priced with the [LiteLLM](https://github.com/BerriAI/litellm)
+dataset limitping already caches for `ping`. Nothing is uploaded: the scan is
+local, read-only, and runs alongside the usage fetch, so it costs no extra wall
+time.
+
+Two consequences worth knowing: it is a **local** view — sessions run on another
+machine, or in the web app, leave no transcript here and are not counted — and
+the cost is an **estimate**, since a subscription does not bill per token. A
+model too new to be in the pricing dataset still has its tokens counted; it just
+adds nothing to the dollar figure (`cost_complete: false` in JSON).
+
+`status -v` breaks the day down by bucket and by model:
+
+```
+  today  55.0M tok  ≈ $41.03
+         in 770 · cache 53.6M read / 1.1M write · out 300.6K
+         claude-opus-5              54.9M tok  ≈ $40.95
+         claude-haiku-4-5-20251001  67.4K tok  ≈ $0.09
+```
+
+The line is omitted entirely for a provider whose CLI has never run on this
+machine — silence there is honest, where `0 tok` would claim a quiet day.
+
 `status --json` returns the same data as a JSON array (one object per provider),
 for scripts and dashboards. Progress chatter is suppressed so stdout stays a
 single valid document; a provider that fails to read becomes
 `{"provider": "...", "error": "..."}` and the command exits non-zero. Add `-v`
 to embed each provider's raw response under `raw`.
+
+`today` is omitted for a provider with no local transcripts at all; when
+present, `cost_usd` is the API-rate estimate and `cost_complete` is false if a
+model that ran had no published rates, making that figure a lower bound.
 
 A window key (`five_hour` / `weekly`) is omitted when the provider does not
 currently enforce that limit — e.g. OpenAI temporarily removed Codex's 5h
@@ -348,6 +387,20 @@ the weekly reset instead of every 5h.
           "granted_at": "2026-06-17T17:38:38Z",
           "expires_at": "2026-07-17T17:38:38Z"
         }
+      ]
+    },
+    "today": {
+      "date": "2026-06-17",
+      "input_tokens": 674291,
+      "cache_read_tokens": 19719552,
+      "cache_creation_tokens": 0,
+      "output_tokens": 81039,
+      "total_tokens": 20474882,
+      "cost_usd": 10.059257,
+      "cost_complete": true,
+      "models": [
+        { "model": "gpt-5.6-sol", "total_tokens": 13774852, "cost_usd": 7.748941 },
+        { "model": "gpt-5.6-terra", "total_tokens": 6700030, "cost_usd": 2.310316 }
       ]
     },
     "limit_reached": false,
@@ -555,6 +608,7 @@ internal/auth            Claude (Keychain) + Codex (auth.json) tokens
 internal/provider        per-provider ReadUsage (endpoint) + Trigger (CLI)
 internal/activity        hook-based active-session state (shared by the hook cmd + scheduler)
 internal/pricing         pricing helpers for providers that expose token usage
+internal/spend           today's tokens/cost, read from the CLIs' local session transcripts
 internal/scheduler       the watch engine (sleep-until-reset, weekly-respect, backoff)
 internal/notify          macOS osascript notifications
 internal/cli             cobra commands: status, ping, watch, schedule, continue, background, config, hooks, upgrade, uninstall, version

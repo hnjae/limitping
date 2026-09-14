@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/wavever/CCLimitPing/internal/config"
+	"github.com/wavever/CCLimitPing/internal/spend"
 )
 
 const (
@@ -277,15 +278,19 @@ func runBgStatus(ctx context.Context, out io.Writer) error {
 	// Per-provider usage, the same view as `limitping status`.
 	fmt.Fprintln(out)
 	for _, p := range providers {
+		spendCh := make(chan *spend.Day, 1)
+		go func() { spendCh <- todaySpend(ctx, p.Name()) }()
+
 		rctx, cancel := context.WithTimeout(ctx, bgUsageTimeout)
 		u, uerr := p.ReadUsage(rctx)
 		cancel()
+		day := <-spendCh
 		if uerr != nil {
 			fmt.Fprintf(out, text.statusErrorFmt, p.Name(), localizedProviderError(text, uerr))
 			fmt.Fprintln(out)
 			continue
 		}
-		printUsage(out, text, u, false, cfg.UsageDisplay)
+		printUsage(out, text, u, false, cfg.UsageDisplay, day)
 	}
 
 	fmt.Fprintln(out, text.bgHintManage)
