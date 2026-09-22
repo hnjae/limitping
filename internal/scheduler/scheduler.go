@@ -24,6 +24,8 @@ import (
 
 const (
 	postPingGrace  = 15 * time.Second // wait after a ping before re-reading usage
+	pingConfirm    = 20 * time.Second // wait between re-reads while confirming a ping's window
+	pingConfirmMax = 4                // re-reads before falling back to an estimated window
 	minBackoff     = 30 * time.Second
 	maxBackoff     = 10 * time.Minute
 	rateLimitPause = 5 * time.Minute
@@ -104,6 +106,7 @@ func (s *Scheduler) runTarget(ctx context.Context, t Target) {
 	backoff := minBackoff
 	aligned := t.AlignStart.IsZero() // whether the align gate has been passed
 	var lastPingAt time.Time
+	pingConfirms := 0 // re-reads spent waiting for the last ping's window to show up
 
 	for {
 		if ctx.Err() != nil {
@@ -190,13 +193,26 @@ func (s *Scheduler) runTarget(ctx context.Context, t Target) {
 		}
 
 		// Window is free. Guard against double-pinging if our last ping isn't
-		// reflected by the endpoint yet.
+		// reflected by the endpoint yet. Estimating the cycle from our own ping
+		// time is the last resort, not the first: it anchors the next ping to
+		// when we pinged rather than to when the window actually resets, which
+		// walks the whole schedule forward by a ping's latency every cycle. So
+		// give the endpoint a few more reads to publish the real reset time
+		// first.
 		if !lastPingAt.IsZero() {
 			est := lastPingAt.Add(windowLen(u.FiveHour))
 			if time.Now().Before(est) {
-				wait := time.Until(est) + s.cfg.ResetBuffer.Duration
-				s.log.Printf("[%s] recent ping not yet visible; waiting %s", name, wait.Round(time.Second))
-				s.live.set(name, "awaiting window", time.Now().Add(wait))
+				wait, confirming := pingVisibilityWait(est, s.cfg.ResetBuffer.Duration, pingConfirms, time.Now())
+				if confirming {
+					pingConfirms++
+					s.log.Printf("[%s] ping not visible in usage yet; re-checking in %s (%d/%d)",
+						name, wait.Round(time.Second), pingConfirms, pingConfirmMax)
+					s.live.set(name, "confirming window…", time.Now().Add(wait))
+				} else {
+					s.log.Printf("[%s] ping still not visible; estimating the window, waiting %s",
+						name, wait.Round(time.Second))
+					s.live.set(name, "awaiting window (estimated)", time.Now().Add(wait))
+				}
 				if !sleepCtx(ctx, wait) {
 					return
 				}
@@ -251,7 +267,7 @@ func (s *Scheduler) runTarget(ctx context.Context, t Target) {
 			// cycle from the configured window length to keep the loop sane.
 			// Sleep immediately instead of doing an extra usage read that cannot
 			// observe a real newly-started window.
-			lastPingAt = time.Now()
+			lastPingAt, pingConfirms = time.Now(), 0
 			wait := windowLen(u.FiveHour) + s.cfg.ResetBuffer.Duration
 			s.live.set(name, "dry-run — next estimated ping", lastPingAt.Add(wait))
 			if !sleepCtx(ctx, wait) {
@@ -269,7 +285,7 @@ func (s *Scheduler) runTarget(ctx context.Context, t Target) {
 			backoff = nextBackoff(backoff)
 			continue
 		}
-		lastPingAt = time.Now()
+		lastPingAt, pingConfirms = time.Now(), 0
 		s.log.Printf("[%s] ping sent, new window started%s%s", name, triggerModel(res), triggerCost(res))
 		s.live.set(name, "ping sent — checking window soon", lastPingAt.Add(postPingGrace))
 		s.notify(name+": window started", "New 5h window"+triggerCost(res))
@@ -344,6 +360,23 @@ func triggerCost(res *provider.TriggerResult) string {
 		s += fmt.Sprintf(", $%.4f", res.CostUSD)
 	}
 	return s
+}
+
+// pingVisibilityWait decides how to wait when the window our own ping started
+// has not shown up in usage yet. est is when a window estimated from the ping
+// time would end. While confirming, it re-reads soon so that the real reset
+// time — once published — is what drives the cycle; only after pingConfirmMax
+// re-reads does it give up and wait out the estimate, which is a whole window
+// spent on a guess anchored to our ping rather than to the provider's reset.
+func pingVisibilityWait(est time.Time, buffer time.Duration, attempts int, now time.Time) (wait time.Duration, confirming bool) {
+	wait = est.Sub(now) + buffer
+	if attempts >= pingConfirmMax {
+		return wait, false
+	}
+	if wait > pingConfirm {
+		wait = pingConfirm
+	}
+	return wait, true
 }
 
 func windowLen(w usage.Window) time.Duration {

@@ -54,8 +54,8 @@ func TestCodexReadUsageSendsCompatibleHeaders(t *testing.T) {
 				"plan_type": "pro",
 				"rate_limit": {
 					"limit_reached": false,
-					"primary_window": {"used_percent": 12, "limit_window_seconds": 18000, "reset_at": 4102444800},
-					"secondary_window": {"used_percent": 34, "limit_window_seconds": 604800, "reset_at": 4103049600}
+					"primary_window": {"used_percent": 12, "limit_window_seconds": 18000, "reset_after_seconds": 12000, "reset_at": 4102444800},
+					"secondary_window": {"used_percent": 34, "limit_window_seconds": 604800, "reset_after_seconds": 400000, "reset_at": 4103049600}
 				}
 			}`
 		case "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits":
@@ -103,6 +103,86 @@ func TestCodexReadUsageSendsCompatibleHeaders(t *testing.T) {
 	}
 }
 
+// The backend reports an idle limit as a full-length window that slides forward
+// on every read, not as "no window". Observed 2026-09-19 on an idle 5h window:
+// used_percent 0, reset_after_seconds 18000 == limit_window_seconds, reset_at
+// moving with the clock between reads. Reading that as a running window parked
+// watch for good — it kept seeing 5h left and never pinged — so it has to come
+// out of the reader as a window with no reset time.
+func TestCodexWindowAnchoring(t *testing.T) {
+	now := time.Date(2026, 9, 19, 18, 29, 44, 0, time.UTC)
+	fiveHourAt := func(secs int) int64 { return now.Add(time.Duration(secs) * time.Second).Unix() }
+
+	cases := []struct {
+		name       string
+		w          codexWindow
+		wantActive bool
+	}{
+		{
+			"idle 5h window slides forward",
+			codexWindow{UsedPercent: 0, LimitWindowSeconds: 18000, ResetAfterSeconds: 18000, ResetAt: fiveHourAt(18000)},
+			false,
+		},
+		{
+			// A window only a ping has touched: 0% used, but running.
+			"window a ping just started",
+			codexWindow{UsedPercent: 0, LimitWindowSeconds: 18000, ResetAfterSeconds: 17975, ResetAt: fiveHourAt(17975)},
+			true,
+		},
+		{
+			"window with real consumption",
+			codexWindow{UsedPercent: 58, LimitWindowSeconds: 18000, ResetAfterSeconds: 9000, ResetAt: fiveHourAt(9000)},
+			true,
+		},
+		{
+			"expired window not yet rolled over",
+			codexWindow{UsedPercent: 100, LimitWindowSeconds: 18000, ResetAfterSeconds: 0, ResetAt: fiveHourAt(-12)},
+			false, // reset time is in the past, so nothing is running
+		},
+		{
+			// reset_after_seconds is the skew-free signal; without it the local
+			// clock decides, and a full window ahead still reads as idle.
+			"idle window without reset_after_seconds",
+			codexWindow{UsedPercent: 0, LimitWindowSeconds: 18000, ResetAt: fiveHourAt(18000)},
+			false,
+		},
+		{
+			"anchored window without reset_after_seconds",
+			codexWindow{UsedPercent: 0, LimitWindowSeconds: 18000, ResetAt: fiveHourAt(17000)},
+			true,
+		},
+	}
+	for _, c := range cases {
+		got := codexWindowToUsage(c.w, now)
+		if active := !got.ResetsAt.IsZero() && now.Before(got.ResetsAt); active != c.wantActive {
+			t.Errorf("%s: running = %t, want %t (resets_at %v)", c.name, active, c.wantActive, got.ResetsAt)
+		}
+		// Whatever the verdict, the limit is still enforced: the window must not
+		// collapse into usage.Window.Missing, which means "no such limit".
+		if got.Missing() {
+			t.Errorf("%s: window reported as missing; the limit is enforced", c.name)
+		}
+		if got.UsedPercent != c.w.UsedPercent || got.WindowSeconds != c.w.LimitWindowSeconds {
+			t.Errorf("%s: window = %#v, want used/length preserved", c.name, got)
+		}
+	}
+}
+
+// An idle weekly window slides the same way, and must not be read as running
+// either — otherwise the weekly-only regime waits for a reset that never comes.
+func TestCodexWindowAnchoringWeekly(t *testing.T) {
+	now := time.Date(2026, 9, 19, 18, 29, 44, 0, time.UTC)
+	idle := codexWindow{
+		UsedPercent:        0,
+		LimitWindowSeconds: 604800,
+		ResetAfterSeconds:  604800,
+		ResetAt:            now.Add(604800 * time.Second).Unix(),
+	}
+	if got := codexWindowToUsage(idle, now); !got.ResetsAt.IsZero() {
+		t.Fatalf("idle weekly window resets_at = %v, want none", got.ResetsAt)
+	}
+}
+
 // Since 2026-07-12 (5h limit temporarily removed) the weekly window arrives in
 // primary_window with secondary_window null; windows must be classified by
 // length, not position, and the missing 5h window must stay missing.
@@ -125,7 +205,7 @@ func TestCodexReadUsageWeeklyOnlyRegime(t *testing.T) {
 			"rate_limit": {
 				"allowed": true,
 				"limit_reached": false,
-				"primary_window": {"used_percent": 24, "limit_window_seconds": 604800, "reset_at": 4103049600},
+				"primary_window": {"used_percent": 24, "limit_window_seconds": 604800, "reset_after_seconds": 400000, "reset_at": 4103049600},
 				"secondary_window": null
 			},
 			"rate_limit_reset_credits": {"available_count": 3}
@@ -170,8 +250,8 @@ func TestCodexReadUsageIgnoresResetCreditFailure(t *testing.T) {
 			"plan_type": "pro",
 			"rate_limit": {
 				"limit_reached": false,
-				"primary_window": {"used_percent": 12, "limit_window_seconds": 18000, "reset_at": 4102444800},
-				"secondary_window": {"used_percent": 34, "limit_window_seconds": 604800, "reset_at": 4103049600}
+				"primary_window": {"used_percent": 12, "limit_window_seconds": 18000, "reset_after_seconds": 12000, "reset_at": 4102444800},
+				"secondary_window": {"used_percent": 34, "limit_window_seconds": 604800, "reset_after_seconds": 400000, "reset_at": 4103049600}
 			}
 		}`
 		return &http.Response{

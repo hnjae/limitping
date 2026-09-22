@@ -37,6 +37,13 @@ const (
 	// codexRedeemCooldown throttles the automatic redemption path so a
 	// once-a-minute poll loop cannot re-attempt a refused redemption every cycle.
 	codexRedeemCooldown = 15 * time.Minute
+
+	// codexAnchorSkew is how much clock disagreement codexWindowAnchored tolerates
+	// when it has to fall back to the local clock. A ping's own window is at least
+	// postPingGrace old by the time the scheduler looks, so erring on the side of
+	// "not started" costs at most one extra ping, while erring the other way would
+	// park watch on a window that does not exist.
+	codexAnchorSkew = 5 * time.Second
 )
 
 // Codex reads usage via the ChatGPT backend usage endpoint and triggers windows
@@ -194,6 +201,7 @@ func codexActiveTask(_ context.Context) (string, bool, error) {
 type codexWindow struct {
 	UsedPercent        float64 `json:"used_percent"`
 	LimitWindowSeconds int     `json:"limit_window_seconds"`
+	ResetAfterSeconds  int     `json:"reset_after_seconds"`
 	ResetAt            int64   `json:"reset_at"`
 }
 
@@ -201,7 +209,9 @@ type codexWindow struct {
 // limit is not currently enforced. OpenAI did exactly that between 2026-07-12
 // and (at the latest) 2026-09-09, when the 5h limit was gone and primary_window
 // carried the weekly one — hence codexWindowsFromRateLimit classifying by
-// length rather than by position.
+// length rather than by position. Note that a limit which is enforced but has no
+// window running is a different thing entirely, and is not nulled out: see
+// codexWindowAnchored.
 type codexRateLimit struct {
 	Allowed      bool         `json:"allowed"`
 	LimitReached bool         `json:"limit_reached"`
@@ -294,11 +304,12 @@ func readCodexResetCredits(ctx context.Context, auth *auth.CodexAuth) (*usage.Re
 }
 
 func codexUsageToUsage(provider string, body []byte, r codexUsageResp) *usage.Usage {
-	fiveHour, weekly := codexWindowsFromRateLimit(r.RateLimit)
+	now := time.Now()
+	fiveHour, weekly := codexWindowsFromRateLimit(r.RateLimit, now)
 	u := &usage.Usage{
 		Provider:     provider,
 		Plan:         r.PlanType,
-		FetchedAt:    time.Now(),
+		FetchedAt:    now,
 		Raw:          body,
 		LimitReached: r.RateLimit.LimitReached,
 		FiveHour:     fiveHour,
@@ -600,31 +611,62 @@ func codexIsBudgetModel(m codexCatalogModel) bool {
 // so position no longer identifies a window. A window a couple of days or
 // longer is the weekly one; anything shorter is the 5h one. A limit whose
 // window is absent stays the zero Window (usage.Window.Missing).
-func codexWindowsFromRateLimit(rl codexRateLimit) (fiveHour, weekly usage.Window) {
+func codexWindowsFromRateLimit(rl codexRateLimit, now time.Time) (fiveHour, weekly usage.Window) {
 	const weeklyMinSeconds = 2 * 24 * 60 * 60
 	for _, w := range []*codexWindow{rl.Primary, rl.Secondary} {
 		if w == nil {
 			continue
 		}
 		if w.LimitWindowSeconds >= weeklyMinSeconds {
-			weekly = codexWindowToUsage(*w)
+			weekly = codexWindowToUsage(*w, now)
 		} else {
-			fiveHour = codexWindowToUsage(*w)
+			fiveHour = codexWindowToUsage(*w, now)
 		}
 	}
 	return fiveHour, weekly
 }
 
-func codexWindowToUsage(w codexWindow) usage.Window {
-	var resetsAt time.Time
-	if w.ResetAt > 0 {
-		resetsAt = time.Unix(w.ResetAt, 0)
-	}
-	return usage.Window{
+// codexWindowToUsage normalizes one window. A window no request has started
+// carries no reset time, which is how usage.Window says "no active window" —
+// see codexWindowAnchored for why the backend's own reset time cannot be taken
+// at face value.
+func codexWindowToUsage(w codexWindow, now time.Time) usage.Window {
+	out := usage.Window{
 		UsedPercent:   w.UsedPercent,
-		ResetsAt:      resetsAt,
 		WindowSeconds: w.LimitWindowSeconds,
 	}
+	if w.ResetAt > 0 && codexWindowAnchored(w, now) {
+		out.ResetsAt = time.Unix(w.ResetAt, 0)
+	}
+	return out
+}
+
+// codexWindowAnchored reports whether a request has actually started this
+// window. The backend never says "no window is running": it answers with a
+// full-length one that slides forward on every read — used_percent 0 and
+// reset_after_seconds equal to limit_window_seconds, i.e. "here is when a window
+// would end if you started one now". Verified 2026-09-19 on an idle 5h window:
+// two reads 11s apart both returned reset_at = now + 18000.
+//
+// So the length that is left is the signal. A window a request anchored has
+// strictly less of itself remaining than its own length, and its reset time
+// holds still across reads; an unanchored one has all of it left, every time.
+// Taking that at face value is what made watch sit on a window it had never
+// started and never ping.
+//
+// reset_after_seconds is the server's own countdown, so the comparison is immune
+// to clock skew here. Only when that field is absent does it fall back to the
+// local clock, and then with a tolerance, so skew alone cannot make an idle
+// window look anchored.
+func codexWindowAnchored(w codexWindow, now time.Time) bool {
+	if w.LimitWindowSeconds <= 0 {
+		return false
+	}
+	if w.ResetAfterSeconds > 0 {
+		return w.ResetAfterSeconds < w.LimitWindowSeconds
+	}
+	remaining := time.Unix(w.ResetAt, 0).Sub(now)
+	return remaining < time.Duration(w.LimitWindowSeconds)*time.Second-codexAnchorSkew
 }
 
 func triggerCodex(ctx context.Context, cfg config.ProviderConfig, dryRun bool) (*TriggerResult, error) {

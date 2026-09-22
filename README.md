@@ -357,6 +357,14 @@ window on 2026-07-12, leaving only the weekly cap. Text mode prints
 `not currently enforced` for such a window, and `watch` schedules its ping at
 the weekly reset instead of every 5h.
 
+An enforced limit that nothing has started yet is a different state: text mode
+prints `(no active window)` and `resets_at` is absent from the JSON, because a
+rolling window has no reset time until a request anchors it. Codex does not
+report that state directly — it answers with a full-length window that slides
+forward on every read (`reset_after_seconds` equal to `limit_window_seconds`),
+i.e. when a window *would* end if you started one now. limitping normalizes that
+away, so a reset time is only ever shown for a window that is really running.
+
 ```json
 [
   {
