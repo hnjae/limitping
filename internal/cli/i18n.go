@@ -28,7 +28,7 @@ type cliText struct {
 	statusJSONFlag    string
 	statusFetchingFmt string
 
-	// Text-mode usage rendering (status, bg status).
+	// Text-mode usage rendering (status).
 	statusErrorFmt            string // provider name, error
 	statusFiveHourLineFmt     string // formatted window
 	statusWeeklyLineFmt       string // formatted window
@@ -52,7 +52,7 @@ type cliText struct {
 	statusListSep             string
 	statusNowWord             string
 
-	// Today's local token consumption (status, bg status).
+	// Today's local token consumption (status).
 	statusTodayLineFmt      string // rendered token/cost summary
 	statusTodayTokensFmt    string // token count
 	statusTodayCostFmt      string // cost, appended to the token count
@@ -75,15 +75,6 @@ type cliText struct {
 	watchLiveFlag          string
 	watchAlreadyRunningFmt string
 
-	scheduleShort      string
-	scheduleLong       string
-	scheduleEveryFlag  string
-	scheduleAtFlag     string
-	scheduleStartedFmt string
-	scheduleNextFmt    string
-	scheduleRunFmt     string
-	scheduleErrorFmt   string
-
 	// `continue` interactive proxy strings.
 	continueShort       string
 	continueLong        string
@@ -103,41 +94,6 @@ type cliText struct {
 	redeemNoCredit      string
 	redeemAlready       string
 	redeemUnknownFmt    string // raw outcome code
-
-	bgShort          string
-	bgLong           string
-	bgExample        string
-	bgStartShort     string
-	bgStartLong      string
-	bgStatusShort    string
-	bgStopShort      string
-	bgLogsShort      string
-	bgLogsFollowFlag string
-	bgLogsLinesFlag  string
-
-	// bg runtime (stdout) strings.
-	bgHintStart          string
-	bgHintManage         string
-	bgNotRunning         string
-	bgClearedStaleFmt    string
-	bgRunningFmt         string
-	bgFieldWatching      string
-	bgFieldUptime        string
-	bgFieldStarted       string
-	bgFieldLogs          string
-	bgFieldPings         string
-	bgPingNone           string
-	bgPingSummaryFmt     string
-	bgPingShowingLastFmt string
-	bgPingSucceeded      string
-	bgPingFailed         string
-	bgPingDryRun         string
-	bgStartedFmt         string
-	bgLogPathFmt         string
-	bgStartFollowUp      string
-	bgStopWasStaleFmt    string
-	bgStoppedFmt         string
-	bgNoLogYetFmt        string
 
 	configShort     string
 	configInitShort string
@@ -279,24 +235,6 @@ Examples:
 	watchLiveFlag:          "show a live heartbeat/status line while watching (uses more power)",
 	watchAlreadyRunningFmt: "watch already running (pid %d, provider %s%s, started %s); stop it before starting another watcher",
 
-	scheduleShort: "Run scheduled pings at fixed intervals or daily times",
-	scheduleLong: `Run scheduled pings for the selected provider. Unlike watch, this follows your wall-clock schedule instead of waiting for the provider's reset time.
-
-Arguments:
-  provider  Optional. One of: claude, codex, all.
-            Defaults to all, which pings every enabled provider.
-
-Examples:
-  limitping schedule codex --at 05:00
-  limitping schedule --at 05:00 --at 13:00 --at 21:00
-  limitping schedule codex --every 5h --dry-run`,
-	scheduleEveryFlag:  "run repeatedly after this interval (for example 5h, 90m)",
-	scheduleAtFlag:     "run at a daily local time HH:MM; repeat the flag or use commas for multiple times",
-	scheduleStartedFmt: "Scheduled ping for %s (%s%s).\n",
-	scheduleNextFmt:    "Next scheduled ping at %s (in %s).\n",
-	scheduleRunFmt:     "===== scheduled ping: %s =====\n",
-	scheduleErrorFmt:   "schedule run completed with error: %v\n",
-
 	continueShort: "Proxy a provider's CLI and auto-continue its task when the 5h limit recovers",
 	continueLong: `Launch a provider's interactive CLI through limitping. Your terminal is passed straight through — you drive Codex / Claude Code exactly as usual — while limitping watches usage in the background and, when the 5h limit recovers after being hit, sends your continue message so a long task resumes itself instead of sitting parked.
 
@@ -336,57 +274,6 @@ Examples:
 	redeemNoCredit:      "the account has no reset credits available",
 	redeemAlready:       "this redemption already completed earlier",
 	redeemUnknownFmt:    "unexpected outcome from the backend: %s",
-
-	bgShort: "Run watch in the background — start | stop | status | logs",
-	bgLong: `Run the watch daemon detached from the terminal so it keeps pinging across 5h windows after you close the shell.
-
-Subcommands:
-  start [provider]   launch the background watcher (also takes --dry-run)
-  stop               stop the background watcher
-  status             show whether it's running (this is also what bare 'bg' prints)
-  logs               show its log output (-f to follow, -n N for the last N lines)
-
-Only one watcher runs at a time, foreground or background. The background process detaches into its own session, so it survives the terminal closing — but it does not restart on reboot (use a launchd/systemd agent for start-at-login).`,
-	bgExample:    "  limitping bg start          # start in the background\n  limitping bg start codex    # only Codex\n  limitping bg status         # is it running?  (same as: limitping bg)\n  limitping bg logs -f        # follow the log\n  limitping bg stop           # stop it",
-	bgStartShort: "Start watch as a background process",
-	bgStartLong: `Launch the watch daemon in the background (detached from the terminal) and return immediately, freeing your shell. Output goes to a log file under the config directory.
-
-Arguments:
-  provider  Optional. One of: claude, codex, all.
-            Defaults to all, which watches every enabled provider.
-
-Examples:
-  limitping bg start
-  limitping bg start claude
-  limitping bg start --dry-run`,
-	bgStatusShort:    "Show whether the background watcher is running",
-	bgStopShort:      "Stop the background watcher",
-	bgLogsShort:      "Show the background watcher's log output",
-	bgLogsFollowFlag: "follow the log output (like tail -f)",
-	bgLogsLinesFlag:  "number of trailing log lines to show",
-
-	bgHintStart:          "Start it with: limitping bg start [claude|codex] [--dry-run]",
-	bgHintManage:         "Manage it with: limitping bg logs -f  |  limitping bg stop",
-	bgNotRunning:         "Background watch: not running.",
-	bgClearedStaleFmt:    "Background watch: not running (cleared stale pid %d).\n",
-	bgRunningFmt:         "Background watch: running (pid %d).\n",
-	bgFieldWatching:      "watching",
-	bgFieldUptime:        "uptime",
-	bgFieldStarted:       "started",
-	bgFieldLogs:          "logs",
-	bgFieldPings:         "ping history",
-	bgPingNone:           "none recorded since this watcher started",
-	bgPingSummaryFmt:     "%d total (%d succeeded, %d failed, %d dry-run)\n",
-	bgPingShowingLastFmt: "showing last %d",
-	bgPingSucceeded:      "succeeded",
-	bgPingFailed:         "failed",
-	bgPingDryRun:         "dry-run",
-	bgStartedFmt:         "Started background watch (pid %d, provider %s%s).\n",
-	bgLogPathFmt:         "Logs: %s\n",
-	bgStartFollowUp:      "Check status with `limitping bg status`; stop with `limitping bg stop`.",
-	bgStopWasStaleFmt:    "Background watch was not running (cleared stale pid %d).\n",
-	bgStoppedFmt:         "Stopped background watch (pid %d).\n",
-	bgNoLogYetFmt:        "No log file yet at %s\n",
 
 	configShort:     "Manage the configuration file",
 	configInitShort: "Write a default config file",

@@ -21,9 +21,8 @@ one reset; it starts when you send the first billable request. If that
 happens hours later, the gap is wasted and your window schedule drifts.
 
 `limitping` watches the reset time and sends one tiny request through the
-official provider CLI right after rollover. Run it once, keep `watch` in the
-foreground, or start a detached `bg` watcher that keeps your window chain alive
-after the terminal closes.
+official provider CLI right after rollover. Run `ping` once or keep `watch`
+in the foreground to maintain your window chain.
 
 ```text
 claude  ✓ pinged (6.6s)
@@ -33,10 +32,8 @@ codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 ## Highlights
 
 - Keeps 5h windows continuous by pinging as soon as a reset is safely available.
-- Runs the way you do: one-shot `ping`, foreground `watch`, or detached
-  `bg start` with `bg status`, `bg logs -f`, and `bg stop`.
-- Shows 5h and weekly usage, reset countdowns, and background watcher state from
-  read-only usage endpoints.
+- Runs as one-shot `ping` or foreground `watch`.
+- Shows 5h and weekly usage and reset countdowns from read-only usage endpoints.
 - Counts today's tokens and what they would have cost at API rates, read from the
   CLIs' own local session transcripts — the number the percentages never show.
 - Triggers Claude Code and Codex through their official CLIs using your existing
@@ -66,15 +63,10 @@ nix build
 ./result/bin/limitping status
 ./result/bin/limitping ping --dry-run
 ./result/bin/limitping watch                # foreground, low-power (Ctrl-C to stop)
-# ...or run it in the background, freeing your terminal:
-./result/bin/limitping bg start
-./result/bin/limitping bg status
-./result/bin/limitping bg logs -f
 ```
 
 Use dry-run first if you want to inspect what would happen without consuming
-provider quota: `limitping ping --dry-run`, `limitping watch --dry-run`, or
-`limitping bg start --dry-run`.
+provider quota: `limitping ping --dry-run` or `limitping watch --dry-run`.
 
 This fork is based on upstream
 [CCLimitPing](https://github.com/wavever/CCLimitPing); fork licensing is
@@ -153,17 +145,11 @@ limitping watch                # foreground daemon: ping each window at reset (a
 limitping watch claude         # watch only one provider (claude|codex)
 limitping watch --live         # optional live heartbeat/status line
 limitping watch --dry-run      # log when pings would fire, without sending
-limitping schedule codex --at 05:00 --at 13:00  # ping at daily local times
-limitping schedule --every 5h  # ping on a fixed interval instead of reset time
 limitping redeem --dry-run     # show which Codex reset credit would be spent
 limitping redeem               # spend it now (irreversible)
 limitping continue codex       # proxy the CLI; auto-resume the task on 5h recovery
 limitping continue codex --yolo             # flags after the provider pass through
 limitping continue claude --dangerously-skip-permissions
-limitping bg start             # run watch in the background, freeing the terminal
-limitping bg status            # running? + each watched provider's usage (alias: limitping bg)
-limitping bg logs -f           # follow the background watcher's log
-limitping bg stop              # stop the background watcher
 limitping hooks install        # install active-session detection hooks (claude|codex|all)
 limitping hooks uninstall      # remove those hooks
 limitping version              # print the version (aliases: v, ver)
@@ -189,9 +175,7 @@ package installs `limitping` only. Build-from-source users can run
 | `status` | `s`, `stat` |
 | `ping` | `p` |
 | `watch` | `w` |
-| `schedule` | `sched` |
 | `redeem` | `r` |
-| `background` | `bg` |
 | `config` | `c`, `cfg` |
 | `config init` | `c i` |
 | `config path` | `c p` |
@@ -384,7 +368,7 @@ Top-level keys:
   pinging and waits for the weekly reset (unless usable credits exist).
 - **`reset_buffer`** — how long to wait after a window's reset time before
   pinging, so the window has definitely rolled over.
-- **`usage_display`** — whether text `status` / `bg status` renders each window
+- **`usage_display`** — whether text `status` renders each window
   as used percentage or remaining percentage.
 - **`align_start`** (per provider) — pin the phase of your windows: set to a
   future RFC3339 time to delay the very first ping until then; afterwards windows
@@ -436,43 +420,9 @@ written). The hooks invoke the hidden `limitping hook <provider>` command on
 > Codex once to enable them. Remove the hook entries with
 > `limitping hooks uninstall` before removing limitping from your Nix profile.
 
-## Scheduled pings
+## Start `watch` at login on macOS
 
-Use `schedule` when you want **wall-clock pings** instead of reset-aligned
-window chaining. It keeps running in the foreground and fires `ping` at the next
-configured interval or daily local time:
-
-```sh
-limitping schedule codex --at 05:00
-limitping schedule codex --at 05:00 --at 13:00 --at 21:00
-limitping schedule --at 05:00,13:00,21:00
-limitping schedule codex --every 5h --dry-run
-```
-
-You can combine `--every` and `--at`; whichever next occurrence comes first is
-used. `--at` values are daily local times in `HH:MM` or `HH:MM:SS` form.
-
-## Run `watch` in the background
-
-`watch` runs in the foreground. To free your terminal, run it as a detached
-background process with the built-in `bg` command:
-
-```sh
-limitping bg start          # start watch detached from the terminal
-limitping bg status         # running? pid, uptime, log + each provider's usage (alias: limitping bg)
-limitping bg logs -f        # follow the watcher's log (-n N for last N lines)
-limitping bg stop           # stop it
-```
-
-`watch` defaults to low-power log output. Add `--live` if you want a foreground
-heartbeat/status line. `bg start` takes the same optional `[provider]` argument
-and `--dry-run` flag as `watch`. Only one watcher (foreground or background) runs
-at a time, and background output is written to
-`~/.config/limitping/bg.log` (honors `$XDG_CONFIG_HOME`). The process detaches
-into its own session, so it survives the shell closing — but it does **not**
-restart on reboot.
-
-For **start-at-login** on macOS, use a `launchd` agent instead. Create
+To start `watch` at login on macOS, create a `launchd` agent at
 `~/Library/LaunchAgents/com.limitping.watch.plist`:
 
 ```xml
@@ -500,7 +450,7 @@ launchctl load ~/Library/LaunchAgents/com.limitping.watch.plist
 
 ## Auto-continue a parked task
 
-`watch` and `bg` keep your window chain warm, but they don't resume a task that
+`watch` keeps your window chain warm, but it doesn't resume a task that
 has already stalled at the 5h limit. `limitping continue <provider>` does: it
 launches the provider's real interactive CLI through a PTY and passes your
 terminal straight through, so you drive Codex / Claude Code exactly as usual.
@@ -551,7 +501,7 @@ internal/pricing         pricing helpers for providers that expose token usage
 internal/spend           today's tokens/cost, read from the CLIs' local session transcripts
 internal/scheduler       the watch engine (sleep-until-reset, weekly-respect, backoff)
 internal/notify          macOS osascript notifications
-internal/cli             cobra commands: status, ping, watch, schedule, continue, background, config, hooks, version
+internal/cli             cobra commands: status, ping, watch, continue, config, hooks, version
 ```
 
 ## Contributing

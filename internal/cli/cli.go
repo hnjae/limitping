@@ -139,7 +139,7 @@ func newRootCmd() *cobra.Command {
 	if text.usageTemplate != "" {
 		root.SetUsageTemplate(text.usageTemplate)
 	}
-	root.AddCommand(newStatusCmd(), newPingCmd(), newWatchCmd(), newScheduleCmd(), newContinueCmd(), newRedeemCmd(), newBackgroundCmd(), newConfigCmd(), newHooksCmd(), newHookCmd(), newVersionCmd())
+	root.AddCommand(newStatusCmd(), newPingCmd(), newWatchCmd(), newContinueCmd(), newRedeemCmd(), newConfigCmd(), newHooksCmd(), newHookCmd(), newVersionCmd())
 	localizeCompletionCommand(root, text)
 	root.SetHelpCommand(newHelpCommand(text))
 	localizeHelpFlags(root, text)
@@ -150,7 +150,7 @@ func newRootCmd() *cobra.Command {
 // localizeInvocations rewrites the `limitping <command>` examples in the help
 // text to whichever name the binary was invoked as, so they stay copy-pasteable
 // under the alias. Only invocations are touched: a bare "limitping" is the
-// product name ("limitping watches usage in the background") and stays put.
+// product name and stays put.
 // A no-op unless the alias was used.
 func localizeInvocations(root *cobra.Command) {
 	name := invokedName()

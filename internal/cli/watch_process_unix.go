@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //go:build !windows
@@ -6,12 +7,6 @@
 package cli
 
 import "syscall"
-
-// detachSysProcAttr puts the background watcher in its own session, detached from
-// the controlling terminal so it survives the launching shell closing.
-func detachSysProcAttr() *syscall.SysProcAttr {
-	return &syscall.SysProcAttr{Setsid: true}
-}
 
 // processAlive reports whether a process with the given pid is currently running.
 // Signal 0 does the kernel's existence/permission check without delivering a
@@ -23,10 +18,4 @@ func processAlive(pid int) bool {
 	}
 	err := syscall.Kill(pid, 0)
 	return err == nil || err == syscall.EPERM
-}
-
-// terminateProcess asks the process to shut down gracefully (SIGTERM); watch
-// catches it and stops its loops cleanly.
-func terminateProcess(pid int) error {
-	return syscall.Kill(pid, syscall.SIGTERM)
 }

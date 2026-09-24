@@ -69,30 +69,6 @@ func acquireWatchLock(provider string, dryRun bool) (func(), error) {
 	}
 }
 
-func activeWatchLock() (watchLockState, bool) {
-	path, err := watchLockPath()
-	if err != nil {
-		return watchLockState{}, false
-	}
-	st, ok := readWatchLockPath(path)
-	if !ok {
-		return watchLockState{}, false
-	}
-	if processAlive(st.PID) {
-		return st, true
-	}
-	_ = os.Remove(path)
-	return watchLockState{}, false
-}
-
-func watchLockPath() (string, error) {
-	dir, err := config.Dir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, watchLockName), nil
-}
-
 func readWatchLockPath(path string) (watchLockState, bool) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -116,4 +92,12 @@ func releaseWatchLock(path string, pid int) {
 func watchAlreadyRunningError(st watchLockState) error {
 	started := st.StartedAt.Format("2006-01-02 15:04:05")
 	return fmt.Errorf(localizedText().watchAlreadyRunningFmt, st.PID, st.Provider, dryRunNote(st.DryRun), started)
+}
+
+// dryRunNote renders the watch mode in an already-running error.
+func dryRunNote(dryRun bool) string {
+	if dryRun {
+		return " (dry-run)"
+	}
+	return ""
 }

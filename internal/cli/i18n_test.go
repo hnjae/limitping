@@ -15,14 +15,13 @@ func TestRootCommandAliases(t *testing.T) {
 
 	root := newRootCmd()
 	cases := map[string]string{
-		"p":     "ping",
-		"sched": "schedule",
-		"s":     "status",
-		"w":     "watch",
-		"c":     "config",
-		"cfg":   "config",
-		"v":     "version",
-		"ver":   "version",
+		"p":   "ping",
+		"s":   "status",
+		"w":   "watch",
+		"c":   "config",
+		"cfg": "config",
+		"v":   "version",
+		"ver": "version",
 	}
 
 	for alias, want := range cases {
@@ -37,12 +36,12 @@ func TestRootCommandAliases(t *testing.T) {
 
 	for _, command := range root.Commands() {
 		switch command.Name() {
-		case "upgrade", "uninstall":
+		case "upgrade", "uninstall", "background", "schedule":
 			t.Errorf("removed command %q is still registered", command.Name())
 		}
 		for _, alias := range command.Aliases {
 			switch alias {
-			case "up", "update", "rm", "remove":
+			case "up", "update", "rm", "remove", "bg", "sched":
 				t.Errorf("removed alias %q is still registered", alias)
 			}
 		}
