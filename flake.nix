@@ -74,7 +74,7 @@
           pname = "limitping";
           version = "unstable";
           src = ./.;
-          vendorHash = "sha256-6HHze/dqTd4PFVBYiLxqG20z5AYycUxHG6graVe+Q/8=";
+          vendorHash = "sha256-M6lE7Dk/f8+PLY+8uS5lbEhPnez0OUDmyWdZnwnIQ+Y=";
           subPackages = [ "cmd/limitping" ];
           env.CGO_ENABLED = "0";
         };

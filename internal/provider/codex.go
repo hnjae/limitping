@@ -23,7 +23,6 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/hnjae/limitping/internal/activity"
 	"github.com/hnjae/limitping/internal/auth"
 	"github.com/hnjae/limitping/internal/config"
 	"github.com/hnjae/limitping/internal/pricing"
@@ -69,10 +68,6 @@ func NewCodex(cfg config.ProviderConfig) *Codex {
 }
 
 func (c *Codex) Name() string { return "codex" }
-
-func (c *Codex) ActiveTask(ctx context.Context) (string, bool, error) {
-	return codexActiveTask(ctx)
-}
 
 func (c *Codex) ReadUsage(ctx context.Context) (*usage.Usage, error) {
 	body, r, err := readCodexUsage(ctx, c.auth)
@@ -190,16 +185,6 @@ func randomIdempotencyKey() string {
 func creditIdempotencyKey(c usage.ResetCredit) string {
 	sum := sha256.Sum256([]byte("limitping-reset-credit|" + c.ExpiresAt.UTC().Format(time.RFC3339)))
 	return hex.EncodeToString(sum[:16])
-}
-
-func codexActiveTask(_ context.Context) (string, bool, error) {
-	// Active-session detection relies entirely on the Codex CLI hooks (see
-	// `limitping hooks install`). Without them we don't guess from the process
-	// list; the scheduler just pings.
-	if !activity.Enabled("codex") {
-		return "", false, nil
-	}
-	return activity.Active("codex")
 }
 
 type codexWindow struct {
@@ -684,12 +669,9 @@ func triggerCodex(ctx context.Context, cfg config.ProviderConfig, dryRun bool) (
 	// Desktop thread list. --json is what makes the ping checkable at all — the
 	// turn.completed event is the only local proof that a billable request went
 	// out, which is what starts the window.
-	//
-	// Hooks stay off because a ping is a synthetic session: the user's hooks
-	// have no business firing for it, and it must not register itself as an
-	// active Codex session. The sandbox is pinned read-only because nothing
-	// reviews what the model does here — unlike an interactive session, which
-	// has a human at the keys.
+	// Hooks stay off because a ping is a synthetic session: user hooks must
+	// not fire for it. The sandbox is pinned read-only because nothing reviews
+	// what the model does here — unlike an interactive session with a human.
 	args := []string{
 		"exec", "--ephemeral", "--json",
 		"--skip-git-repo-check",

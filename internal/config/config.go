@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package config loads and validates limitping's TOML configuration.
@@ -40,12 +41,8 @@ type ProviderConfig struct {
 	Model           string   `toml:"model"`
 	ReasoningEffort string   `toml:"reasoning_effort"`
 	AlignStart      string   `toml:"align_start"`
-	// ContinuePrompt is the message injected into a proxied session
-	// (`limitping continue <provider>`) when the 5h limit recovers.
-	// Empty falls back to "continue".
-	ContinuePrompt string `toml:"continue_prompt"`
-	// AutoRedeem lets `watch` and `continue` spend a banked reset credit that is
-	// about to lapse. Codex-only, and off by default: redeeming is irreversible.
+	// AutoRedeem lets `watch` spend a banked reset credit that is about to
+	// lapse. Codex-only, and off by default: redeeming is irreversible.
 	AutoRedeem bool `toml:"auto_redeem"`
 }
 
@@ -75,11 +72,10 @@ func Default() Config {
 		Notify:          true,
 		UsageDisplay:    "used",
 		Claude: ProviderConfig{
-			Enabled:        true,
-			Prompt:         ".",
-			Model:          "haiku",
-			ExtraArgs:      []string{},
-			ContinuePrompt: "continue",
+			Enabled:   true,
+			Prompt:    ".",
+			Model:     "haiku",
+			ExtraArgs: []string{},
 		},
 		Codex: ProviderConfig{
 			Enabled: true,
@@ -89,7 +85,6 @@ func Default() Config {
 			// OpenAI retired gpt-5.4-mini.
 			Model:           "",
 			ReasoningEffort: "low",
-			ContinuePrompt:  "continue",
 		},
 	}
 }
@@ -199,9 +194,6 @@ model = "haiku"
 extra_args = []
 # Optional RFC3339 anchor for the first window's phase; empty = start ASAP.
 align_start = ""
-# Message injected to resume a proxied session when the 5h limit recovers
-# (limitping continue claude). Empty = "continue".
-continue_prompt = "continue"
 
 [codex]
 enabled = true
@@ -216,9 +208,7 @@ model = ""
 reasoning_effort = "low"
 extra_args = []
 align_start = ""
-# Message injected to resume a proxied session when the 5h limit recovers.
-continue_prompt = "continue"
-# Let watch/continue spend a banked reset credit that is about to lapse (within
+# Let watch spend a banked reset credit that is about to lapse (within
 # 24h with usage to reclaim, or in its final hour). Redeeming is irreversible;
 # "limitping redeem" does it manually. See "limitping help redeem".
 auto_redeem = false

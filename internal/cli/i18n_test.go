@@ -36,7 +36,7 @@ func TestRootCommandAliases(t *testing.T) {
 
 	for _, command := range root.Commands() {
 		switch command.Name() {
-		case "upgrade", "uninstall", "background", "schedule":
+		case "upgrade", "uninstall", "background", "schedule", "continue", "hooks", "hook":
 			t.Errorf("removed command %q is still registered", command.Name())
 		}
 		for _, alias := range command.Aliases {
@@ -172,15 +172,9 @@ func TestRedeemIsReachableByItsShortAlias(t *testing.T) {
 	}
 }
 
-func TestWatchAndContinueHelpDocumentAutoRedeem(t *testing.T) {
-	if !strings.Contains(enText.watchLong, "auto_redeem") {
-		t.Error("watch help does not mention auto_redeem")
-	}
-	if !strings.Contains(enText.continueLong, "auto_redeem") {
-		t.Error("continue help does not mention auto_redeem")
-	}
-	if !strings.Contains(enText.watchLong, "redeem") || !strings.Contains(enText.continueLong, "redeem") {
-		t.Error("watch/continue help does not point at the redeem command")
+func TestWatchHelpDocumentsAutoRedeem(t *testing.T) {
+	if !strings.Contains(enText.watchLong, "auto_redeem") || !strings.Contains(enText.watchLong, "redeem") {
+		t.Error("watch help does not document automatic redemption")
 	}
 }
 

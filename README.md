@@ -38,15 +38,10 @@ codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
   CLIs' own local session transcripts — the number the percentages never show.
 - Triggers Claude Code and Codex through their official CLIs using your existing
   logged-in credentials.
-- Detects active Claude/Codex turns via CLI hooks, so a ping never interrupts a
-  session that is already about to start the window itself.
-- Auto-resumes parked tasks: `limitping continue <provider>` proxies the
-  official CLI and types your continue message the moment the 5h limit
-  recovers, so an overnight task doesn't sit at the limit until morning.
 - Spends Codex reset credits before they lapse: `limitping redeem` cashes one in
-  by hand, and `auto_redeem = true` lets `watch` / `continue` spend one on its
-  own once it is close to expiring — a banked reset is worth nothing after it
-  expires. Off by default, because redeeming is irreversible.
+  by hand, and `auto_redeem = true` lets `watch` spend one on its own once
+  it is close to expiring — a banked reset is worth nothing after it expires.
+  Off by default, because redeeming is irreversible.
 - Optional short invocation via an `lmp` symlink (e.g. `lmp s`, `lmp w`).
 - Includes dry-run modes, weekly-limit guards, reset buffers, cheap-model
   defaults, macOS notifications, local config, and no telemetry.
@@ -88,12 +83,8 @@ Two cleanly separated jobs:
 | **Trigger** a new window | the official CLI (interactive Claude Code / headless `codex exec`) | a tiny slice of quota (this is the point) |
 | **Read** usage & reset times | zero-quota usage endpoints (the same ones CodexBar / community plugins use) | none — never starts a window |
 
-When `watch` sees a 5h window has reset, it first checks whether a Claude/Codex
-session is actively mid-turn. If one is, `limitping` waits and re-reads usage
-instead of sending its own ping, because that session's next model request will
-start the new window naturally. This check relies on the
-[CLI hooks](#active-session-detection-hooks); without them, `limitping` skips
-the check and pings as soon as the window resets.
+When `watch` sees a 5h window has reset, it sends a ping to start the next
+window. It does not inspect active Claude/Codex sessions.
 
 - **Claude**: reads `GET https://api.anthropic.com/api/oauth/usage` using the
   OAuth token from the macOS Keychain (`Claude Code-credentials`) or
@@ -112,10 +103,9 @@ the check and pings as soon as the window resets.
   the Codex Desktop thread list. `--json` makes the ping verifiable — its
   `turn.completed` event is the only local proof that a billable request went
   out, and it is where the reported token count and cost come from. The ping
-  also runs with `--disable hooks` and `--sandbox read-only`: your hooks have no
-  business firing for a synthetic session (it must not register itself as an
-  active Codex session either), and nothing reviews what the model does on this
-  path, unlike an interactive session with you at the keys.
+  also runs with `--disable hooks` and `--sandbox read-only`: user hooks must
+  not fire for a synthetic session, and nothing reviews what the model does on
+  this path, unlike an interactive session with you at the keys.
 
 Claude/Codex tokens are reused from the official tools (no separate login) and
 refreshed on 401.
@@ -147,11 +137,6 @@ limitping watch --live         # optional live heartbeat/status line
 limitping watch --dry-run      # log when pings would fire, without sending
 limitping redeem --dry-run     # show which Codex reset credit would be spent
 limitping redeem               # spend it now (irreversible)
-limitping continue codex       # proxy the CLI; auto-resume the task on 5h recovery
-limitping continue codex --yolo             # flags after the provider pass through
-limitping continue claude --dangerously-skip-permissions
-limitping hooks install        # install active-session detection hooks (claude|codex|all)
-limitping hooks uninstall      # remove those hooks
 limitping version              # print the version (aliases: v, ver)
 ```
 
@@ -350,7 +335,6 @@ prompt     = "."
 model      = "haiku"      # cheapest tier; triggering doesn't need a SOTA model
 extra_args = []           # extra Claude CLI args; print/headless-only flags are ignored
 align_start = ""          # optional RFC3339 anchor for the first window; empty = start ASAP
-continue_prompt = "continue"  # message `continue` injects on 5h recovery; empty = "continue"
 
 [codex]
 enabled          = true
@@ -359,7 +343,6 @@ model            = ""     # empty = pick the cheapest model your plan offers
 reasoning_effort = "low"  # "minimal" is rejected when web_search/image_gen tools are enabled
 extra_args       = []     # extra Codex CLI args; exec-only flags such as --json are ignored
 align_start      = ""
-continue_prompt  = "continue"  # message `continue` injects on 5h recovery; empty = "continue"
 ```
 
 Top-level keys:
@@ -394,32 +377,6 @@ cost cache is empty; Codex's model cache has no price field), so the cheapest
 model is a sensible default rather than a live price lookup. Override `model`
 per provider if you prefer.
 
-### Active-session detection (hooks)
-
-At a window reset, `watch` avoids pinging while you're actively working — that
-turn would start the next window on its own. This relies on **CLI hooks**.
-If they aren't installed, `limitping` skips the check entirely and pings right
-at reset (it never guesses from the process list).
-
-Install the hooks manually:
-
-```sh
-limitping hooks install        # both providers (or: limitping hooks install claude)
-```
-
-This registers limitping's hooks in `~/.claude/settings.json` and
-`~/.codex/hooks.json` (your existing settings are preserved; a `.bak` backup is
-written). The hooks invoke the hidden `limitping hook <provider>` command on
-`UserPromptSubmit` / `PreToolUse` / `PostToolUse` / `Stop` (Claude also
-`SessionEnd`) to record whether a session is mid-turn under
-`~/.config/limitping/activity/`.
-
-> [!NOTE]
-> Claude Code loads its hooks automatically — nothing to do there. **Codex**
-> gates custom command hooks behind a one-time trust step: run `/hooks` inside
-> Codex once to enable them. Remove the hook entries with
-> `limitping hooks uninstall` before removing limitping from your Nix profile.
-
 ## Start `watch` at login on macOS
 
 To start `watch` at login on macOS, create a `launchd` agent at
@@ -448,33 +405,6 @@ To start `watch` at login on macOS, create a `launchd` agent at
 launchctl load ~/Library/LaunchAgents/com.limitping.watch.plist
 ```
 
-## Auto-continue a parked task
-
-`watch` keeps your window chain warm, but it doesn't resume a task that
-has already stalled at the 5h limit. `limitping continue <provider>` does: it
-launches the provider's real interactive CLI through a PTY and passes your
-terminal straight through, so you drive Codex / Claude Code exactly as usual.
-In the background it polls usage and, the moment the 5h limit recovers after
-being hit, types your continue message into the session so a long task resumes
-itself instead of sitting parked until you come back.
-
-```sh
-limitping continue codex                       # drive Codex as usual; auto-resume on recovery
-limitping continue codex --yolo                # flags after the provider pass through verbatim
-limitping continue claude --dangerously-skip-permissions
-```
-
-- The resume message is each provider's `continue_prompt` in config (default
-  `"continue"`; set it to e.g. `"keep going"`). Quit from inside the CLI to exit.
-- It only injects on a genuine recovery edge: the 5h window was maxed (or the
-  endpoint reported `limit_reached`, or the CLI printed a limit message) and has
-  since clearly reset, and the weekly window isn't also exhausted (per
-  `weekly_threshold`, credits included) — so it won't resume straight into the
-  weekly wall.
-- A diagnostic timeline is written to `~/.config/limitping/continue.log`.
-- Unix only for now (needs a PTY); on Windows the command reports that it's
-  unsupported.
-
 ## Cost & caveats
 
 - See [PRIVACY.md](PRIVACY.md) for local data handling and network behavior.
@@ -496,12 +426,11 @@ internal/config          TOML config
 internal/usage           normalized usage model
 internal/auth            Claude (Keychain) + Codex (auth.json) tokens
 internal/provider        per-provider ReadUsage (endpoint) + Trigger (CLI)
-internal/activity        hook-based active-session state (shared by the hook cmd + scheduler)
 internal/pricing         pricing helpers for providers that expose token usage
 internal/spend           today's tokens/cost, read from the CLIs' local session transcripts
 internal/scheduler       the watch engine (sleep-until-reset, weekly-respect, backoff)
 internal/notify          macOS osascript notifications
-internal/cli             cobra commands: status, ping, watch, continue, config, hooks, version
+internal/cli             cobra commands: status, ping, watch, redeem, config, version
 ```
 
 ## Contributing

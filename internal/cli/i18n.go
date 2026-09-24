@@ -75,12 +75,6 @@ type cliText struct {
 	watchLiveFlag          string
 	watchAlreadyRunningFmt string
 
-	// `continue` interactive proxy strings.
-	continueShort       string
-	continueLong        string
-	continueBadProvider string
-	continueStartedFmt  string
-
 	// `redeem` reset-credit strings.
 	redeemShort         string
 	redeemLong          string
@@ -99,17 +93,6 @@ type cliText struct {
 	configInitShort string
 	configInitForce string
 	configPathShort string
-
-	hooksShort          string
-	hooksLong           string
-	hooksInstallShort   string
-	hooksInstallLong    string
-	hooksUninstallShort string
-	hooksUninstallLong  string
-	hooksInstalledFmt   string
-	hooksRemovedFmt     string
-	hooksNothingFmt     string
-	hooksTrustCodex     string
 }
 
 func localizedText() cliText { return enText }
@@ -235,31 +218,12 @@ Examples:
 	watchLiveFlag:          "show a live heartbeat/status line while watching (uses more power)",
 	watchAlreadyRunningFmt: "watch already running (pid %d, provider %s%s, started %s); stop it before starting another watcher",
 
-	continueShort: "Proxy a provider's CLI and auto-continue its task when the 5h limit recovers",
-	continueLong: `Launch a provider's interactive CLI through limitping. Your terminal is passed straight through — you drive Codex / Claude Code exactly as usual — while limitping watches usage in the background and, when the 5h limit recovers after being hit, sends your continue message so a long task resumes itself instead of sitting parked.
-
-Arguments:
-  provider     Required. One of: claude, codex.
-  cli args...  Optional. Any flags after the provider are forwarded to the CLI
-               verbatim, e.g. 'limitping continue codex --yolo'.
-
-The continue message is per-provider continue_prompt in the config (default "continue"; set it to e.g. "keep going"). Quit from inside the CLI to exit.
-
-Codex reset credits: set auto_redeem = true under [codex] in the config and the same background watcher also spends a banked reset credit that is about to lapse — within 24h when there is usage worth reclaiming, or in its final hour — so a parked session can resume without waiting for the window. Off by default because redeeming is irreversible; 'limitping redeem' spends one by hand.
-
-Examples:
-  limitping continue codex
-  limitping continue codex --yolo
-  limitping continue claude --dangerously-skip-permissions`,
-	continueBadProvider: "invalid provider (want claude or codex):",
-	continueStartedFmt:  "Proxying %s with auto-continue on 5h-limit recovery (message: %q). Use it as usual; quit from inside the CLI to exit.\n",
-
 	redeemShort: "Spend a banked Codex rate-limit reset credit now",
 	redeemLong: `Consume one of the Codex reset credits shown by 'limitping status', resetting the rate-limit windows it is eligible for.
 
 Redeeming is irreversible. The backend decides which credit to spend and refuses with "nothing to reset" when no window is currently eligible, so a credit is never burned for nothing.
 
-Set auto_redeem = true under [codex] in the config to let 'watch' and 'continue' spend a credit on their own once it is close to expiring (within 24h with real usage to reclaim, or in its final hour).
+Set auto_redeem = true under [codex] in the config to let 'watch' spend a credit on its own once it is close to expiring (within 24h with real usage to reclaim, or in its final hour).
 
 Examples:
   limitping redeem --dry-run
@@ -279,33 +243,4 @@ Examples:
 	configInitShort: "Write a default config file",
 	configInitForce: "overwrite an existing config",
 	configPathShort: "Print the config file path",
-
-	hooksShort: "Manage Claude/Codex hooks for accurate active-session detection",
-	hooksLong: `Manage the hooks that let limitping tell whether a Claude Code or Codex session is actually mid-turn (rather than merely running).
-
-When installed, limitping defers its ping while you're actively working and resumes once the turn ends. Without hooks limitping skips this check and pings as soon as the window resets. The install script sets these hooks up automatically.`,
-	hooksInstallShort: "Register limitping's hooks in the Claude/Codex configs",
-	hooksInstallLong: `Register limitping's hooks in ~/.claude/settings.json and ~/.codex/hooks.json (existing settings are preserved; a .bak backup is written).
-
-Arguments:
-  provider  Optional. One of: claude, codex, all. Defaults to all.
-
-Claude Code loads its hooks automatically. Codex requires a one-time trust: run /hooks inside Codex to enable them.
-
-Examples:
-  limitping hooks install
-  limitping hooks install claude`,
-	hooksUninstallShort: "Remove limitping's hooks from the Claude/Codex configs",
-	hooksUninstallLong: `Remove only limitping's hook entries from ~/.claude/settings.json and ~/.codex/hooks.json, leaving your other hooks untouched (a .bak backup is written).
-
-Arguments:
-  provider  Optional. One of: claude, codex, all. Defaults to all.
-
-Examples:
-  limitping hooks uninstall
-  limitping hooks uninstall codex`,
-	hooksInstalledFmt: "Installed %s hooks → %s\n",
-	hooksRemovedFmt:   "Removed %s hooks from %s\n",
-	hooksNothingFmt:   "No %s hooks found in %s\n",
-	hooksTrustCodex:   "\nCodex requires a one-time trust: run /hooks inside Codex to enable the new hooks.\n(Claude Code loads its hooks automatically — nothing to do there.)\n",
 }
