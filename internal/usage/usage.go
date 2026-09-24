@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 wavever
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Package usage defines the normalized rate-limit usage model shared across
 // providers. Readers translate each provider's raw API response into these
 // types so the scheduler and CLI can treat every provider uniformly.

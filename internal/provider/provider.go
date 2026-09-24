@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 wavever
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Package provider implements per-provider usage reading (zero-quota, via the
 // OAuth usage endpoints) and window triggering (via the official CLIs).
 package provider

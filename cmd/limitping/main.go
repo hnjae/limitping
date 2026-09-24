@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 wavever
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Command limitping keeps Claude Code / Codex rate-limit windows back-to-back
 // by pinging each provider the moment its 5h window resets.
 package main

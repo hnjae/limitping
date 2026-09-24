@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 wavever
+SPDX-FileCopyrightText: 2026 KIM Hyunjae
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 <p align="center">
   <img src="assets/icon.png" alt="CCLimitPing icon" width="160">
 </p>
@@ -6,7 +12,7 @@
 
 [English](README.md) | **中文**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSES/AGPL-3.0-or-later.txt)
 [![CI](https://github.com/wavever/CCLimitPing/actions/workflows/ci.yml/badge.svg)](https://github.com/wavever/CCLimitPing/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/wavever/CCLimitPing?include_prereleases&sort=semver)](https://github.com/wavever/CCLimitPing/releases)
 ![Go](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)
@@ -21,7 +27,7 @@ Claude Code 和 Codex 的订阅限额按 **5 小时滚动窗口**(外加周限�
 `limitping` 会读取每个 Provider 的重置时间,并在窗口翻篇后通过官方 CLI 发一条极小请求。
 你可以手动 `ping` 一次,也可以让 `watch` 前台守护,或者用 `bg start` 脱离终端在后台常驻。
 
-```
+```text
 claude  ✓ pinged (6.6s)
 codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 ```
@@ -124,7 +130,7 @@ limitping upgrade
 `upgrade` 会先检查,已是最新就直接告诉你;`--force` 可强制重装。`status`、`ping`、
 `bg status` 和 `continue` 也会在自己的输出之前提示新版本,每个版本只提示到你处理为止:
 
-```
+```text
 ✨ 有新版本!  0.9.0 -> 0.10.0
    更新说明: https://github.com/wavever/CCLimitPing/releases/latest
 
@@ -240,7 +246,7 @@ limitping uninstall            # 删除 limitping 以及配置/缓存(简称: rm
 token 数和等价 API 费用,数据来自 `codex exec --json`;Claude 仍用交互式触发,CLI 不
 提供可靠的逐次 machine-readable 用量,所以只显示耗时:
 
-```
+```text
 claude  → claude --model haiku .
 claude  ✓ pinged (6.6s)
 codex   → codex exec --ephemeral --json --skip-git-repo-check --disable hooks --sandbox read-only -c model_reasoning_effort=low -m gpt-5.6-luna ok
@@ -251,7 +257,7 @@ codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 目录,或目录里认不出低成本档),就交回给 Codex CLI 决定,此时模型会标注在命令旁边,
 这样仍然能看清这次 ping 消耗在哪个模型上:
 
-```
+```text
 codex   → codex exec --ephemeral --json … -c model_reasoning_effort=low ok  (模型: gpt-5.6-sol)
 ```
 
@@ -261,7 +267,7 @@ ping 结束时会把被 ping 的 Provider 的窗口状态一并打印出来(和 
 
 `status` 示例:
 
-```
+```text
 claude
   5h     [█████░░░░░]  51.0% 已用  3h14m 后重置 (周日 00:10 UTC+8)
   周     [█████░░░░░]  54.0% 已用  7h04m 后重置 (周日 04:00 UTC+8)
@@ -296,7 +302,7 @@ CodexBar 的数据源一致;价格用的是 limitping 早已为 `ping` 缓存的
 
 `status -v` 会按 token 类型和模型展开:
 
-```
+```text
   今日   55.0M tok  ≈ $41.03
          输入 770 · 缓存 读 53.6M / 写 1.1M · 输出 300.6K
          claude-opus-5              54.9M tok  ≈ $40.95
@@ -546,7 +552,7 @@ limitping continue claude --dangerously-skip-permissions
 
 ## 目录结构
 
-```
+```text
 cmd/limitping            CLI 入口
 internal/config          TOML 配置
 internal/usage           归一化的用量模型
@@ -590,7 +596,3 @@ git tag v0.10.0 && git push origin v0.10.0
 Release notes 由 commit 日志生成,所以**提交标题就是 release notes** —— 请按"用户愿意读
 的一行字"来写。仓库里不再维护手写 changelog,已发布的说明见
 [Releases](https://github.com/wavever/CCLimitPing/releases) 页面。
-
-## 许可证
-
-[MIT](LICENSE) © wavever

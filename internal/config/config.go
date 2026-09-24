@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 wavever
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Package config loads and validates limitping's TOML configuration.
 package config
 

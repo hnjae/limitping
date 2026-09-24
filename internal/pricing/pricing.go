@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 wavever
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Package pricing computes a USD cost for token usage using the LiteLLM pricing
 // dataset — the same approach CodexBar/ccusage use. Providers like Codex (on a
 // ChatGPT subscription) don't return a USD cost, so we derive the equivalent

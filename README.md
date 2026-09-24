@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 wavever
+SPDX-FileCopyrightText: 2026 KIM Hyunjae
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 <p align="center">
   <img src="assets/icon.png" alt="CCLimitPing icon" width="160">
 </p>
@@ -6,7 +12,7 @@
 
 **English** | [中文](README.zh-CN.md)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSES/AGPL-3.0-or-later.txt)
 [![CI](https://github.com/wavever/CCLimitPing/actions/workflows/ci.yml/badge.svg)](https://github.com/wavever/CCLimitPing/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/wavever/CCLimitPing?include_prereleases&sort=semver)](https://github.com/wavever/CCLimitPing/releases)
 ![Go](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)
@@ -25,7 +31,7 @@ official provider CLI right after rollover. Run it once, keep `watch` in the
 foreground, or start a detached `bg` watcher that keeps your window chain alive
 after the terminal closes.
 
-```
+```text
 claude  ✓ pinged (6.6s)
 codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 ```
@@ -145,7 +151,7 @@ limitping upgrade
 reinstalls anyway. `status`, `ping`, `bg status` and `continue` also announce a
 new release before their own output, once per release:
 
-```
+```text
 ✨ Update available!  0.9.0 -> 0.10.0
    Release notes: https://github.com/wavever/CCLimitPing/releases/latest
 
@@ -188,7 +194,7 @@ sudo mv limitping /usr/local/bin/
 ```
 
 **Homebrew** (macOS / Linux) — `brew install wavever/tap/limitping`
-_(works once the Homebrew tap is set up — see `.goreleaser.yaml`)._
+*(works once the Homebrew tap is set up — see XXXXXXXXXXXXXXXXXX).*
 
 **From source** (developers, needs Go 1.25+):
 
@@ -269,7 +275,7 @@ Codex ping reports the turn's tokens and an equivalent API cost, read from
 `codex exec --json`; Claude's interactive trigger session exposes no reliable
 machine-readable per-ping usage, so it shows elapsed time only:
 
-```
+```text
 claude  → claude --model haiku .
 claude  ✓ pinged (6.6s)
 codex   → codex exec --ephemeral --json --skip-git-repo-check --disable hooks --sandbox read-only -c model_reasoning_effort=low -m gpt-5.6-luna ok
@@ -281,7 +287,7 @@ cannot pick one — no catalog on disk, or no recognizable budget tier in it —
 Codex CLI chooses instead, and the model is reported alongside the command so
 you still see what the ping spent quota on:
 
-```
+```text
 codex   → codex exec --ephemeral --json … -c model_reasoning_effort=low ok  (model: gpt-5.6-sol)
 ```
 
@@ -293,7 +299,7 @@ new state to report.
 
 Example `status`:
 
-```
+```text
 claude
   5h     [█████░░░░░]  51.0% used      resets in 3h14m    (Sun 00:10 UTC+8)
   weekly [█████░░░░░]  54.0% used      resets in 7h04m    (Sun 04:00 UTC+8)
@@ -331,7 +337,7 @@ adds nothing to the dollar figure (`cost_complete: false` in JSON).
 
 `status -v` breaks the day down by bucket and by model:
 
-```
+```text
   today  55.0M tok  ≈ $41.03
          in 770 · cache 53.6M read / 1.1M write · out 300.6K
          claude-opus-5              54.9M tok  ≈ $40.95
@@ -608,7 +614,7 @@ limitping continue claude --dangerously-skip-permissions
 
 ## Layout
 
-```
+```text
 cmd/limitping            CLI entry
 internal/config          TOML config
 internal/usage           normalized usage model
@@ -655,7 +661,3 @@ Release notes are generated from the commit log, so **commit subjects are the
 release notes** — write them as a line a user would want to read. There is no
 hand-maintained changelog to keep in sync; published notes live on the
 [Releases](https://github.com/wavever/CCLimitPing/releases) page.
-
-## License
-
-[MIT](LICENSE) © wavever

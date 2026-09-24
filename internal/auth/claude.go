@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 wavever
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Package auth loads (and, when necessary, refreshes) the OAuth credentials
 // that Claude Code and Codex already store on disk / in the Keychain. We reuse
 // the official tools' credentials rather than managing our own login.

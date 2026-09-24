@@ -1,4 +1,8 @@
 #!/bin/sh
+
+# SPDX-FileCopyrightText: 2026 wavever
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # limitping installer — downloads the right prebuilt binary from the latest
 # GitHub release. No Go required.
 #

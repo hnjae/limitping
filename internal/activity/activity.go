@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 wavever
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Package activity tracks whether a provider's CLI session is mid-turn, using
 // signals written by limitping's hook command (see `limitping hook`). It is the
 // hook-based replacement for process scanning: a session counts as active only

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 wavever
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Package update tracks whether a newer limitping release exists, so a user is
 // told about it instead of having to remember to check. The published version
 // is cached in <config dir>/version.json and refreshed at most once a day, so

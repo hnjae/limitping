@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 wavever
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Code of Conduct
 
 This project aims to be a practical, respectful place for people improving a

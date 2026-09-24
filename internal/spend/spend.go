@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 wavever
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Package spend reports how many tokens the local Claude Code / Codex CLIs
 // consumed on a given day and what that would have cost at API rates.
 //

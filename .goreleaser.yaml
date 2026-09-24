@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 wavever
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # GoReleaser config — produces prebuilt binaries so users don't need Go.
 # Cut a release by pushing a tag:  git tag v0.1.0 && git push origin v0.1.0
 # The release workflow (.github/workflows/release.yml) runs GoReleaser on tags.
@@ -38,6 +41,8 @@ archives:
       - README.md
       - README.zh-CN.md
       - LICENSE
+      - LICENSES/AGPL-3.0-or-later.txt
+      - LICENSES/MIT.txt
 
 checksum:
   name_template: "checksums.txt"

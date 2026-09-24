@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 wavever
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Package notify sends desktop notifications. On macOS it uses osascript; on
 // other platforms it is a no-op so callers don't need to branch.
 package notify

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 wavever
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Package scheduler runs the watch loop: for each provider it sleeps until the
 // 5h window resets, then triggers a minimal ping to start the next window,
 // keeping windows back-to-back. It respects the weekly limit and never lets a

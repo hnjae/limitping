@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 wavever
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Privacy
 
 `limitping` is a local command-line tool. It does not include analytics,
