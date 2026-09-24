@@ -5,11 +5,11 @@ version = 1
 
 [[annotations]]
 path = [
-  ".github/*.md",
-  ".github/ISSUE_TEMPLATE/*.md",
-  "assets/*",
-  "AGENTS.md",
+  ".github/**/*.md",
   "go.sum",
 ]
-SPDX-FileCopyrightText = "2026 wavever"
+SPDX-FileCopyrightText = [
+  "2026 wavever",
+  "2026 KIM Hyunjae",
+]
 SPDX-License-Identifier = "AGPL-3.0-or-later"

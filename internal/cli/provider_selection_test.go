@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package cli
@@ -7,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wavever/CCLimitPing/internal/config"
-	"github.com/wavever/CCLimitPing/internal/provider"
-	"github.com/wavever/CCLimitPing/internal/scheduler"
+	"github.com/hnjae/limitping/internal/config"
+	"github.com/hnjae/limitping/internal/provider"
+	"github.com/hnjae/limitping/internal/scheduler"
 )
 
 func TestDefaultConfigSelectsBothProviders(t *testing.T) {

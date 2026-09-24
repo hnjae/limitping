@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //go:build !windows
@@ -19,7 +20,7 @@ import (
 	"github.com/creack/pty"
 	"golang.org/x/term"
 
-	"github.com/wavever/CCLimitPing/internal/config"
+	"github.com/hnjae/limitping/internal/config"
 )
 
 // runContinueProxy launches providerName's interactive CLI (plus any passthrough

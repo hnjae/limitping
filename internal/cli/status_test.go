@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package cli
@@ -15,10 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wavever/CCLimitPing/internal/pricing"
-	"github.com/wavever/CCLimitPing/internal/provider"
-	"github.com/wavever/CCLimitPing/internal/spend"
-	"github.com/wavever/CCLimitPing/internal/usage"
+	"github.com/hnjae/limitping/internal/pricing"
+	"github.com/hnjae/limitping/internal/provider"
+	"github.com/hnjae/limitping/internal/spend"
+	"github.com/hnjae/limitping/internal/usage"
 )
 
 // TestMain points the transcript scan at an empty directory for the whole

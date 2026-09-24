@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package pricing computes a USD cost for token usage using the LiteLLM pricing
@@ -20,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wavever/CCLimitPing/internal/config"
+	"github.com/hnjae/limitping/internal/config"
 )
 
 // litellmURL is the canonical pricing dataset ccusage/CodexBar pull from.

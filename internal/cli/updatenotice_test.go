@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package cli
@@ -8,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wavever/CCLimitPing/internal/update"
+	"github.com/hnjae/limitping/internal/update"
 )
 
 func TestPromptUpdateOffersThreeChoices(t *testing.T) {

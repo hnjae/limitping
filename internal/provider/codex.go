@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package provider
@@ -22,11 +23,11 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/wavever/CCLimitPing/internal/activity"
-	"github.com/wavever/CCLimitPing/internal/auth"
-	"github.com/wavever/CCLimitPing/internal/config"
-	"github.com/wavever/CCLimitPing/internal/pricing"
-	"github.com/wavever/CCLimitPing/internal/usage"
+	"github.com/hnjae/limitping/internal/activity"
+	"github.com/hnjae/limitping/internal/auth"
+	"github.com/hnjae/limitping/internal/config"
+	"github.com/hnjae/limitping/internal/pricing"
+	"github.com/hnjae/limitping/internal/usage"
 )
 
 const (

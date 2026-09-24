@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package cli
@@ -15,7 +16,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/wavever/CCLimitPing/internal/activity"
+	"github.com/hnjae/limitping/internal/activity"
 )
 
 // Hooks let limitping detect whether a Claude/Codex session is actually mid-turn

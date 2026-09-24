@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package spend
@@ -12,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wavever/CCLimitPing/internal/pricing"
+	"github.com/hnjae/limitping/internal/pricing"
 )
 
 // codexLine is the envelope every rollout record shares.

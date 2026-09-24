@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package provider
@@ -15,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wavever/CCLimitPing/internal/config"
-	"github.com/wavever/CCLimitPing/internal/usage"
+	"github.com/hnjae/limitping/internal/config"
+	"github.com/hnjae/limitping/internal/usage"
 )
 
 // fakeCodexHome points CODEX_HOME at a temp dir holding credentials, so a test

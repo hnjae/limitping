@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package spend reports how many tokens the local Claude Code / Codex CLIs
@@ -22,7 +23,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/wavever/CCLimitPing/internal/pricing"
+	"github.com/hnjae/limitping/internal/pricing"
 )
 
 // ModelSpend is one model's share of a day.

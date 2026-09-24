@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package provider implements per-provider usage reading (zero-quota, via the
@@ -19,7 +20,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wavever/CCLimitPing/internal/usage"
+	"github.com/hnjae/limitping/internal/usage"
 )
 
 const (

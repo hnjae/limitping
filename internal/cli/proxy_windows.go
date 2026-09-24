@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 //go:build windows
@@ -10,7 +11,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/wavever/CCLimitPing/internal/config"
+	"github.com/hnjae/limitping/internal/config"
 )
 
 // runContinueProxy is unsupported on Windows: the proxy relies on a Unix PTY and

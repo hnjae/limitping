@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package update tracks whether a newer limitping release exists, so a user is
@@ -24,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wavever/CCLimitPing/internal/config"
+	"github.com/hnjae/limitping/internal/config"
 )
 
 const (
@@ -34,9 +35,9 @@ const (
 	// command: an update notice is never worth making limitping feel stuck.
 	checkTimeout = 2 * time.Second
 
-	latestReleaseAPI = "https://api.github.com/repos/wavever/CCLimitPing/releases/latest"
+	latestReleaseAPI = "https://api.github.com/repos/hnjae/limitping/releases/latest"
 	// ReleaseNotesURL is shown alongside the notice.
-	ReleaseNotesURL = "https://github.com/wavever/CCLimitPing/releases/latest"
+	ReleaseNotesURL = "https://github.com/hnjae/limitping/releases/latest"
 )
 
 // State is the cached view of the newest published release.

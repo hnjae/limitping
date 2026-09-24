@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package cli
@@ -10,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wavever/CCLimitPing/internal/provider"
-	"github.com/wavever/CCLimitPing/internal/usage"
+	"github.com/hnjae/limitping/internal/provider"
+	"github.com/hnjae/limitping/internal/usage"
 )
 
 // A ping's own output cannot answer the question it is run to answer: a ping is

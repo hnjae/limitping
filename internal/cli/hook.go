@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package cli
@@ -9,7 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/wavever/CCLimitPing/internal/activity"
+	"github.com/hnjae/limitping/internal/activity"
 )
 
 // maxHookInput caps how much of stdin we read; hook payloads are tiny.

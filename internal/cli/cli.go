@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package cli wires up the limitping command-line interface.
@@ -15,9 +16,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/wavever/CCLimitPing/internal/config"
-	"github.com/wavever/CCLimitPing/internal/provider"
-	"github.com/wavever/CCLimitPing/internal/scheduler"
+	"github.com/hnjae/limitping/internal/config"
+	"github.com/hnjae/limitping/internal/provider"
+	"github.com/hnjae/limitping/internal/scheduler"
 )
 
 // Version is set at build time via -ldflags by the release pipeline. Leaving it

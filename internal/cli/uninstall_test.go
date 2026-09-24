@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package cli
@@ -194,7 +195,7 @@ func TestVersionCommandRepairsTheAliasForOlderUpgraders(t *testing.T) {
 	dir := t.TempDir()
 	exe := filepath.Join(dir, "limitping")
 
-	build := exec.Command("go", "build", "-o", exe, "github.com/wavever/CCLimitPing/cmd/limitping")
+	build := exec.Command("go", "build", "-o", exe, "github.com/hnjae/limitping/cmd/limitping")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}

@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package cli
@@ -20,10 +21,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/wavever/CCLimitPing/internal/update"
+	"github.com/hnjae/limitping/internal/update"
 )
 
-const releaseDownloadBase = "https://github.com/wavever/CCLimitPing/releases/latest/download"
+const releaseDownloadBase = "https://github.com/hnjae/limitping/releases/latest/download"
 
 func newUpgradeCmd() *cobra.Command {
 	var force bool

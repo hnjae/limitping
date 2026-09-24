@@ -1,17 +1,18 @@
 #!/bin/sh
 
 # SPDX-FileCopyrightText: 2026 wavever
+# SPDX-FileCopyrightText: 2026 KIM Hyunjae
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 # limitping installer — downloads the right prebuilt binary from the latest
 # GitHub release. No Go required.
 #
-#   curl -fsSL https://raw.githubusercontent.com/wavever/CCLimitPing/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/hnjae/limitping/main/install.sh | sh
 #
 # Override the install directory with LIMITPING_INSTALL_DIR=/path sh install.sh
 set -eu
 
-REPO="wavever/CCLimitPing"
+REPO="hnjae/limitping"
 BIN="limitping"
 ALIAS="lmp" # short name, symlinked next to the binary
 

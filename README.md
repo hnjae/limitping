@@ -4,17 +4,11 @@ SPDX-FileCopyrightText: 2026 KIM Hyunjae
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-<p align="center">
-  <img src="assets/icon.png" alt="CCLimitPing icon" width="160">
-</p>
+# `limitping`
 
-# CCLimitPing (`limitping`)
-
-**English** | [中文](README.zh-CN.md)
-
-[![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSES/AGPL-3.0-or-later.txt)
-[![CI](https://github.com/wavever/CCLimitPing/actions/workflows/ci.yml/badge.svg)](https://github.com/wavever/CCLimitPing/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/wavever/CCLimitPing?include_prereleases&sort=semver)](https://github.com/wavever/CCLimitPing/releases)
+[![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSE.md)
+[![CI](https://github.com/hnjae/limitping/actions/workflows/ci.yml/badge.svg)](https://github.com/hnjae/limitping/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/hnjae/limitping?include_prereleases&sort=semver)](https://github.com/hnjae/limitping/releases)
 ![Go](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)
 
@@ -62,21 +56,29 @@ codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 
 ## Quick start
 
+Until the fork publishes its first release, build from source (Go 1.25+):
+
 ```sh
-curl -fsSL https://raw.githubusercontent.com/wavever/CCLimitPing/main/install.sh | sh
-limitping config init
-limitping status
-limitping ping --dry-run
-limitping watch                # foreground, low-power (Ctrl-C to stop)
+git clone https://github.com/hnjae/limitping.git
+cd limitping
+go build -o limitping ./cmd/limitping
+./limitping config init
+./limitping status
+./limitping ping --dry-run
+./limitping watch                # foreground, low-power (Ctrl-C to stop)
 # ...or run it in the background, freeing your terminal:
-limitping bg start
-limitping bg status
-limitping bg logs -f
+./limitping bg start
+./limitping bg status
+./limitping bg logs -f
 ```
 
 Use dry-run first if you want to inspect what would happen without consuming
 provider quota: `limitping ping --dry-run`, `limitping watch --dry-run`, or
 `limitping bg start --dry-run`.
+
+This fork is based on upstream
+[CCLimitPing](https://github.com/wavever/CCLimitPing); fork licensing is
+documented in [LICENSE.md](LICENSE.md).
 
 ## Supported providers
 
@@ -129,31 +131,35 @@ refreshed on 401.
 
 ## Install
 
-`limitping` ships as a single self-contained binary — **no Go required**.
+The fork has not published a release yet. Until one is available, use the
+[source quick start](#quick-start). The release-based options below require a
+published release from this fork; they never install upstream binaries.
 
-**One-line script** (macOS / Linux):
+**One-line script** (macOS / Linux), available after the first fork release:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/wavever/CCLimitPing/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/hnjae/limitping/main/install.sh | sh
 ```
 
-Downloads the right prebuilt binary from the
-[latest release](https://github.com/wavever/CCLimitPing/releases/latest) into
-`/usr/local/bin` (or `~/.local/bin`). Override with `LIMITPING_INSTALL_DIR`.
+The installer downloads the platform archive from the
+[fork's latest release](https://github.com/hnjae/limitping/releases/latest)
+into `/usr/local/bin` (or `~/.local/bin`). Override with
+`LIMITPING_INSTALL_DIR`.
 
-**Upgrade** — replace the installed binary with the latest release:
+**Upgrade** — replace the installed binary with the latest fork release:
 
 ```sh
 limitping upgrade
 ```
 
 `upgrade` checks first and says so if you are already current; `--force`
-reinstalls anyway. `status`, `ping`, `bg status` and `continue` also announce a
-new release before their own output, once per release:
+reinstalls anyway. Upgrade downloads require a published fork release.
+`status`, `ping`, `bg status` and `continue` also announce a newer fork release
+before their own output, once per release:
 
 ```text
 ✨ Update available!  0.9.0 -> 0.10.0
-   Release notes: https://github.com/wavever/CCLimitPing/releases/latest
+   Release notes: https://github.com/hnjae/limitping/releases/latest
 
      1. Update now (runs `limitping upgrade`)
    ❯ 2. Skip
@@ -184,25 +190,25 @@ Aliases: `limitping rm`, `limitping remove`.
 Use `limitping uninstall --keep-config` to preserve `~/.config/limitping` (or
 `$XDG_CONFIG_HOME/limitping`).
 
-**Manual download** — grab the archive for your platform from the
-[Releases](https://github.com/wavever/CCLimitPing/releases) page (`.tar.gz` for
-macOS/Linux, `.zip` for Windows):
+**Manual download** — after a fork release is published, grab your platform's
+archive from the [fork's Releases](https://github.com/hnjae/limitping/releases)
+page (`.tar.gz` for macOS/Linux, `.zip` for Windows):
 
 ```sh
 tar -xzf limitping_darwin_arm64.tar.gz
 sudo mv limitping /usr/local/bin/
 ```
 
-**Homebrew** (macOS / Linux) — `brew install wavever/tap/limitping`
-*(works once the Homebrew tap is set up — see XXXXXXXXXXXXXXXXXX).*
-
-**From source** (developers, needs Go 1.25+):
+**From source** (Go 1.25+):
 
 ```sh
-go install github.com/wavever/CCLimitPing/cmd/limitping@latest
-# or, from a clone:
+git clone https://github.com/hnjae/limitping.git
+cd limitping
 go build -o bin/limitping ./cmd/limitping
 ```
+
+`go install github.com/hnjae/limitping/cmd/limitping@latest` works once this
+fork has a published module tag.
 
 Each provider you enable needs its own credentials: the `claude` / `codex` CLIs
 logged in.
@@ -660,4 +666,4 @@ nothing that can drift from the tag. A local `go build` reports
 Release notes are generated from the commit log, so **commit subjects are the
 release notes** — write them as a line a user would want to read. There is no
 hand-maintained changelog to keep in sync; published notes live on the
-[Releases](https://github.com/wavever/CCLimitPing/releases) page.
+[fork's Releases](https://github.com/hnjae/limitping/releases) page.

@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package activity tracks whether a provider's CLI session is mid-turn, using
@@ -21,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wavever/CCLimitPing/internal/config"
+	"github.com/hnjae/limitping/internal/config"
 )
 
 // activityTTL bounds how long a session marker is trusted without a refresh.
