@@ -56,20 +56,20 @@ codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 
 ## Quick start
 
-Until the fork publishes its first release, build from source (Go 1.25+):
+Until the fork publishes its first release, build from source with Nix:
 
 ```sh
 git clone https://github.com/hnjae/limitping.git
 cd limitping
-go build -o limitping ./cmd/limitping
-./limitping config init
-./limitping status
-./limitping ping --dry-run
-./limitping watch                # foreground, low-power (Ctrl-C to stop)
+nix build
+./result/bin/limitping config init
+./result/bin/limitping status
+./result/bin/limitping ping --dry-run
+./result/bin/limitping watch                # foreground, low-power (Ctrl-C to stop)
 # ...or run it in the background, freeing your terminal:
-./limitping bg start
-./limitping bg status
-./limitping bg logs -f
+./result/bin/limitping bg start
+./result/bin/limitping bg status
+./result/bin/limitping bg logs -f
 ```
 
 Use dry-run first if you want to inspect what would happen without consuming
@@ -129,89 +129,15 @@ the window resets.
 Claude/Codex tokens are reused from the official tools (no separate login) and
 refreshed on 401.
 
-## Install
-
-The fork has not published a release yet. Until one is available, use the
-[source quick start](#quick-start). The release-based options below require a
-published release from this fork; they never install upstream binaries.
-
-**One-line script** (macOS / Linux), available after the first fork release:
+## Example of a package installation
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/hnjae/limitping/main/install.sh | sh
+nix profile add 'github:hnjae/limitping'
 ```
-
-The installer downloads the platform archive from the
-[fork's latest release](https://github.com/hnjae/limitping/releases/latest)
-into `/usr/local/bin` (or `~/.local/bin`). Override with
-`LIMITPING_INSTALL_DIR`.
-
-**Upgrade** — replace the installed binary with the latest fork release:
 
 ```sh
-limitping upgrade
+nix profile upgrade --refresh limitping
 ```
-
-`upgrade` checks first and says so if you are already current; `--force`
-reinstalls anyway. Upgrade downloads require a published fork release.
-`status`, `ping`, `bg status` and `continue` also announce a newer fork release
-before their own output, once per release:
-
-```text
-✨ Update available!  0.9.0 -> 0.10.0
-   Release notes: https://github.com/hnjae/limitping/releases/latest
-
-     1. Update now (runs `limitping upgrade`)
-   ❯ 2. Skip
-     3. Skip until next version
-
-   ↑/↓ move · Enter confirm · Esc skip
-```
-
-Move with the arrow keys and confirm with Enter, the way the provider CLIs do
-it; the number keys still pick an option outright. The cursor starts on Skip
-because the notice interrupts the command you actually ran, so Enter, Esc and
-Ctrl-C all leave everything as it was. Option 3 records the release in
-`~/.config/limitping/version.json` and stays quiet until the next one. The check
-runs at most once a day, never blocks for more than two seconds, and is skipped
-entirely without an interactive terminal — so `--json`, the `hook` callback and
-background watchers stay silent.
-
-Aliases: `limitping up`, `limitping update`.
-
-**Uninstall** — remove the installed binary plus config/cache:
-
-```sh
-limitping uninstall
-```
-
-Aliases: `limitping rm`, `limitping remove`.
-
-Use `limitping uninstall --keep-config` to preserve `~/.config/limitping` (or
-`$XDG_CONFIG_HOME/limitping`).
-
-**Manual download** — after a fork release is published, grab your platform's
-archive from the [fork's Releases](https://github.com/hnjae/limitping/releases)
-page (`.tar.gz` for macOS/Linux, `.zip` for Windows):
-
-```sh
-tar -xzf limitping_darwin_arm64.tar.gz
-sudo mv limitping /usr/local/bin/
-```
-
-**From source** (Go 1.25+):
-
-```sh
-git clone https://github.com/hnjae/limitping.git
-cd limitping
-go build -o bin/limitping ./cmd/limitping
-```
-
-`go install github.com/hnjae/limitping/cmd/limitping@latest` works once this
-fork has a published module tag.
-
-Each provider you enable needs its own credentials: the `claude` / `codex` CLIs
-logged in.
 
 ## Usage
 
@@ -259,7 +185,7 @@ The binary itself has a short name too: the installer symlinks `lmp` next to
 `limitping`, so `lmp status`, `lmp w`, and `limitping status` are the same
 command. The installer skips the link if `lmp` already exists or resolves to
 another command on your PATH — a symlink in `/usr/local/bin` shadows anything
-it collides with. (Building from source? `ln -s limitping /usr/local/bin/lmp`.)
+it collides with. (Building from source? Run `./result/bin/limitping` directly.)
 
 | Command | Aliases |
 | --- | --- |

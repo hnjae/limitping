@@ -7,12 +7,9 @@ labels: enhancement
 
 ## Problem
 
-
 ## Proposed solution
 
-
 ## Alternatives considered
-
 
 ## Provider details, if relevant
 

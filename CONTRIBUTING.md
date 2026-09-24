@@ -1,5 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 wavever
+SPDX-FileCopyrightText: 2026 KIM Hyunjae
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
@@ -9,31 +10,29 @@ Thanks for helping improve `limitping`.
 
 ## Development Setup
 
-Requirements:
+Nix with flakes enabled is required. The supported source build is `nix build`;
+run development commands inside `nix develop`. Provider-specific tests
+may also require the provider CLI or credentials.
 
-- Go 1.25+
-- The provider CLI or credentials required by the behavior you want to test
-
-Build and test:
+Build the CLI, then enter the development shell for checks:
 
 ```sh
-go mod download
-gofmt -l .
-go build ./...
+nix build
+nix develop
+prek run --all-files
 go vet ./...
 go test ./...
 ```
 
-`gofmt -l .` should print nothing. If it prints file names, run `gofmt -w` on
-those files before opening a pull request.
-
 ## Local Smoke Tests
 
+Inside `nix develop`, after `nix build`:
+
 ```sh
-go run ./cmd/limitping version
-go run ./cmd/limitping config path
-go run ./cmd/limitping ping --dry-run
-go run ./cmd/limitping watch --dry-run
+./result/bin/limitping version
+./result/bin/limitping config path
+./result/bin/limitping ping --dry-run
+./result/bin/limitping watch --dry-run
 ```
 
 Avoid running non-dry-run `ping` or `watch` during development unless you intend
@@ -54,10 +53,10 @@ validated without real credentials or paid quota.
 ## Pull Request Checklist
 
 - [ ] The change is focused and described clearly
-- [ ] `gofmt -l .` prints nothing
-- [ ] `go build ./...` passes
-- [ ] `go vet ./...` passes
-- [ ] `go test ./...` passes
+- [ ] `prek run --all-files` passes
+- [ ] `nix build` passes
+- [ ] `go vet ./...` passes inside `nix develop`
+- [ ] `go test ./...` passes inside `nix develop`
 - [ ] README or config examples are updated when user-facing behavior changes
 - [ ] No credentials, raw usage responses, or private account metadata are
       included in tests, fixtures, logs, screenshots, or docs

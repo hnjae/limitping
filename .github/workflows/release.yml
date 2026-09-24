@@ -1,17 +1,14 @@
 # SPDX-FileCopyrightText: 2026 wavever
 # SPDX-FileCopyrightText: 2026 KIM Hyunjae
 # SPDX-License-Identifier: AGPL-3.0-or-later
-
+---
 name: release
-
 on:
   push:
     tags:
       - "v*"
-
 permissions:
   contents: write
-
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
@@ -19,11 +16,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"

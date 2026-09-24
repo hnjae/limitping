@@ -7,9 +7,7 @@ labels: bug
 
 ## What happened?
 
-
 ## Expected behavior
-
 
 ## Reproduction
 

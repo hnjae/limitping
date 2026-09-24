@@ -1,18 +1,15 @@
 # SPDX-FileCopyrightText: 2026 wavever
 # SPDX-FileCopyrightText: 2026 KIM Hyunjae
 # SPDX-License-Identifier: AGPL-3.0-or-later
-
+---
 # GoReleaser config — produces prebuilt binaries so users don't need Go.
 # Cut a release by pushing a tag:  git tag v0.1.0 && git push origin v0.1.0
 # The release workflow (.github/workflows/release.yml) runs GoReleaser on tags.
 version: 2
-
 project_name: limitping
-
 before:
   hooks:
     - go mod tidy
-
 builds:
   - id: limitping
     main: ./cmd/limitping
@@ -28,7 +25,6 @@ builds:
       - arm64
     ldflags:
       - -s -w -X github.com/hnjae/limitping/internal/cli.Version={{ .Version }}
-
 archives:
   - id: limitping
     # No version in the name, so https://github.com/.../releases/latest/download/
@@ -42,10 +38,8 @@ archives:
       - README.md
       - LICENSE.md
       - LICENSES/AGPL-3.0-or-later.txt
-
 checksum:
   name_template: "checksums.txt"
-
 changelog:
   # The commit log IS the release notes — there is no hand-maintained changelog
   # to drift from it, so write commit subjects that read as release notes.
@@ -55,7 +49,6 @@ changelog:
   filters:
     exclude:
       - "^Merge "
-
 release:
   github:
     owner: hnjae

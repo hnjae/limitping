@@ -1,37 +1,34 @@
 # SPDX-FileCopyrightText: 2026 wavever
+# SPDX-FileCopyrightText: 2026 KIM Hyunjae
 # SPDX-License-Identifier: AGPL-3.0-or-later
-
+---
 name: ci
-
 on:
   push:
     branches: [main]
   pull_request:
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
+      - uses: DeterminateSystems/determinate-nix-action@main
         with:
-          go-version-file: go.mod
-
+          extra-conf: |
+            experimental-features = nix-command flakes
+      - run: nix build
       - name: gofmt
         run: |
-          unformatted="$(gofmt -l .)"
-          if [ -n "$unformatted" ]; then
-            echo "These files need gofmt:"; echo "$unformatted"; exit 1
-          fi
-
-      - run: go build ./...
-      - run: go vet ./...
-      - run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
-
+          nix develop -c sh -ec '
+            unformatted="$(gofmt -l .)"
+            if [ -n "$unformatted" ]; then
+              echo "These files need gofmt:"; echo "$unformatted"; exit 1
+            fi
+          '
+      - run: nix develop -c go vet ./...
+      - run: nix develop -c go test -race -coverprofile=coverage.out -covermode=atomic ./...
       - name: coverage summary
-        run: go tool cover -func=coverage.out | tail -1
-
+        run: nix develop -c go tool cover -func=coverage.out
   release-config:
     runs-on: ubuntu-latest
     steps:

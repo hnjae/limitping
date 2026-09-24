@@ -1,25 +1,15 @@
 # SPDX-FileCopyrightText: 2026 wavever
+# SPDX-FileCopyrightText: 2026 KIM Hyunjae
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-# build output
+# Managed by nix:
+/.pre-commit-config.yaml
+/treefmt.toml
+
+# Build outputs:
+/result*
 /bin/
 /dist/
-/limitping
 *.out
 coverage.out
 *.test
-
-# local config / secrets
-.env
-.env.*
-!.env.example
-config.toml
-*.local.toml
-
-# logs
-*.log
-
-# os / editor
-.DS_Store
-.idea/
-.vscode/
