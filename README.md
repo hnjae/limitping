@@ -50,7 +50,7 @@ codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
   by hand, and `auto_redeem = true` lets `watch` / `continue` spend one on its
   own once it is close to expiring — a banked reset is worth nothing after it
   expires. Off by default, because redeeming is irreversible.
-- Types short: every command also works as `lmp` (e.g. `lmp s`, `lmp w`).
+- Optional short invocation via an `lmp` symlink (e.g. `lmp s`, `lmp w`).
 - Includes dry-run modes, weekly-limit guards, reset buffers, cheap-model
   defaults, macOS notifications, local config, and no telemetry.
 
@@ -100,9 +100,8 @@ When `watch` sees a 5h window has reset, it first checks whether a Claude/Codex
 session is actively mid-turn. If one is, `limitping` waits and re-reads usage
 instead of sending its own ping, because that session's next model request will
 start the new window naturally. This check relies on the
-[CLI hooks](#active-session-detection-hooks) (installed automatically by the
-install script); without them, `limitping` skips the check and pings as soon as
-the window resets.
+[CLI hooks](#active-session-detection-hooks); without them, `limitping` skips
+the check and pings as soon as the window resets.
 
 - **Claude**: reads `GET https://api.anthropic.com/api/oauth/usage` using the
   OAuth token from the macOS Keychain (`Claude Code-credentials`) or
@@ -168,8 +167,6 @@ limitping bg stop              # stop the background watcher
 limitping hooks install        # install active-session detection hooks (claude|codex|all)
 limitping hooks uninstall      # remove those hooks
 limitping version              # print the version (aliases: v, ver)
-limitping upgrade              # update to the latest GitHub release (aliases: up, update)
-limitping uninstall            # remove limitping plus config/cache (aliases: rm, remove)
 ```
 
 Short aliases are also available for config commands: `limitping c i` for
@@ -181,11 +178,9 @@ Short aliases are also available for config commands: `limitping c i` for
 `Aliases:` line shows both binary names so either one is discoverable from the
 other.
 
-The binary itself has a short name too: the installer symlinks `lmp` next to
-`limitping`, so `lmp status`, `lmp w`, and `limitping status` are the same
-command. The installer skips the link if `lmp` already exists or resolves to
-another command on your PATH — a symlink in `/usr/local/bin` shadows anything
-it collides with. (Building from source? Run `./result/bin/limitping` directly.)
+`lmp` is also recognized when invoked through a symlink named `lmp`; the Nix
+package installs `limitping` only. Build-from-source users can run
+`./result/bin/limitping` directly.
 
 | Command | Aliases |
 | --- | --- |
@@ -199,8 +194,6 @@ it collides with. (Building from source? Run `./result/bin/limitping` directly.)
 | `config init` | `c i` |
 | `config path` | `c p` |
 | `version` | `v`, `ver` |
-| `upgrade` | `up`, `update` |
-| `uninstall` | `rm`, `remove` |
 
 `ping` shows the exact command and a live timer (a spinner on a terminal). The
 Codex ping reports the turn's tokens and an equivalent API cost, read from
@@ -418,12 +411,11 @@ per provider if you prefer.
 ### Active-session detection (hooks)
 
 At a window reset, `watch` avoids pinging while you're actively working — that
-turn would start the next window on its own. This relies on **CLI hooks**, which
-the install script sets up for you. If they aren't installed, `limitping` skips
-the check entirely and pings right at reset (it never guesses from the process
-list).
+turn would start the next window on its own. This relies on **CLI hooks**.
+If they aren't installed, `limitping` skips the check entirely and pings right
+at reset (it never guesses from the process list).
 
-The install script runs this automatically; to (re)install manually:
+Install the hooks manually:
 
 ```sh
 limitping hooks install        # both providers (or: limitping hooks install claude)
@@ -439,8 +431,8 @@ written). The hooks invoke the hidden `limitping hook <provider>` command on
 > [!NOTE]
 > Claude Code loads its hooks automatically — nothing to do there. **Codex**
 > gates custom command hooks behind a one-time trust step: run `/hooks` inside
-> Codex once to enable them. Remove everything later with
-> `limitping hooks uninstall` (also done automatically by `limitping uninstall`).
+> Codex once to enable them. Remove the hook entries with
+> `limitping hooks uninstall` before removing limitping from your Nix profile.
 
 ## Scheduled pings
 
@@ -557,7 +549,7 @@ internal/pricing         pricing helpers for providers that expose token usage
 internal/spend           today's tokens/cost, read from the CLIs' local session transcripts
 internal/scheduler       the watch engine (sleep-until-reset, weekly-respect, backoff)
 internal/notify          macOS osascript notifications
-internal/cli             cobra commands: status, ping, watch, schedule, continue, background, config, hooks, upgrade, uninstall, version
+internal/cli             cobra commands: status, ping, watch, schedule, continue, background, config, hooks, version
 ```
 
 ## Contributing
@@ -587,7 +579,7 @@ Nothing else needs editing. The tag is the only place a version is written down:
 the release build stamps it in via `-ldflags`, and any other build derives its
 version from the module's build info, so there is no constant to bump and
 nothing that can drift from the tag. A local `go build` reports
-`dev+<revision>` and never offers to upgrade itself.
+`dev+<revision>`.
 
 Release notes are generated from the commit log, so **commit subjects are the
 release notes** — write them as a line a user would want to read. There is no

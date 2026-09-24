@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package cli
@@ -51,18 +52,14 @@ func TestRootCommandAliases(t *testing.T) {
 
 	root := newRootCmd()
 	cases := map[string]string{
-		"p":      "ping",
-		"sched":  "schedule",
-		"s":      "status",
-		"w":      "watch",
-		"c":      "config",
-		"cfg":    "config",
-		"v":      "version",
-		"ver":    "version",
-		"up":     "upgrade",
-		"update": "upgrade",
-		"rm":     "uninstall",
-		"remove": "uninstall",
+		"p":     "ping",
+		"sched": "schedule",
+		"s":     "status",
+		"w":     "watch",
+		"c":     "config",
+		"cfg":   "config",
+		"v":     "version",
+		"ver":   "version",
 	}
 
 	for alias, want := range cases {
@@ -72,6 +69,19 @@ func TestRootCommandAliases(t *testing.T) {
 		}
 		if got := cmd.Name(); got != want {
 			t.Fatalf("Find(%q) = %q, want %q", alias, got, want)
+		}
+	}
+
+	for _, command := range root.Commands() {
+		switch command.Name() {
+		case "upgrade", "uninstall":
+			t.Errorf("removed command %q is still registered", command.Name())
+		}
+		for _, alias := range command.Aliases {
+			switch alias {
+			case "up", "update", "rm", "remove":
+				t.Errorf("removed alias %q is still registered", alias)
+			}
 		}
 	}
 
@@ -145,8 +155,6 @@ func TestRootHelpPrintsCommandAliases(t *testing.T) {
 		"ping, p",
 		"status, s, stat",
 		"version, v, ver",
-		"upgrade, up, update",
-		"uninstall, rm, remove",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("help output = %q, want command alias %q", got, want)
@@ -299,8 +307,7 @@ func TestRootHelpAdvertisesBothBinaryNames(t *testing.T) {
 
 // Every string is set in both locales, and format strings take the same verbs.
 // An unset entry is silent at compile time and only shows up at runtime as an
-// empty line or a `%!(EXTRA ...)` tail, which is exactly how upgradeCurrentFmt
-// shipped empty once.
+// empty line or a `%!(EXTRA ...)` tail.
 func TestLocalizedTextIsCompleteInBothLocales(t *testing.T) {
 	// Deliberately empty in English: it falls through to the error's own text.
 	optional := map[string]bool{"statusSubAccessError": true}
@@ -357,29 +364,10 @@ func TestVersionResolution(t *testing.T) {
 	if got := version(); got != "0.10.0" {
 		t.Errorf("version() = %q, want the ldflag without its v", got)
 	}
-	if !isReleaseVersion() {
-		t.Error("a release ldflag should read as a release")
-	}
 
 	Version = ""
 	if got := version(); !strings.HasPrefix(got, DevVersion) {
 		t.Errorf("version() = %q, want a %s build for the test binary", got, DevVersion)
-	}
-	if isReleaseVersion() {
-		t.Error("a local build must not claim to be a release")
-	}
-}
-
-// The tag must stay the only place a version is written down. Hardcoding a
-// default here is what used to drift from it, so guard the invariant rather
-// than relying on remembering it.
-func TestVersionIsNotHardcodedInSource(t *testing.T) {
-	src, err := os.ReadFile("cli.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(src), `var Version = ""`) {
-		t.Fatal(`cli.go must declare 'var Version = ""'; a hardcoded default drifts from the release tag`)
 	}
 }
 

@@ -53,11 +53,6 @@ func version() string {
 	return DevVersion
 }
 
-// isReleaseVersion reports whether the binary knows which published release it
-// is. A local build does not, so it must not be compared against the newest
-// release — there is nothing meaningful to say about whether it is out of date.
-func isReleaseVersion() bool { return releaseVersion(version()) != "" }
-
 var releaseVersionRE = regexp.MustCompile(`^\d+(\.\d+)*$`)
 
 // releaseVersion returns v without its leading "v" when it names a published
@@ -98,12 +93,9 @@ func vcsRevision(bi *debug.BuildInfo) string {
 	return rev
 }
 
-// BinaryAlias is the short name installed alongside the binary, so `lmp` is
-// interchangeable with `limitping`. install.sh creates it as a symlink and
-// `uninstall` removes it. It deliberately avoids the `lp*` namespace, which
-// belongs to CUPS: `lp`, `lpq`, `lpr`, `lprm`, `lpstat` and friends ship on
-// macOS and most Linux distributions, and installing into a directory that
-// precedes /usr/bin on PATH would shadow the system printing commands.
+// BinaryAlias is the short name for invoking limitping as `lmp`. It deliberately
+// avoids the `lp*` namespace, which belongs to CUPS: `lp`, `lpq`, `lpr`, `lprm`,
+// `lpstat` and friends ship on macOS and most Linux distributions.
 const BinaryAlias = "lmp"
 
 // invokedName is the name limitping was called as, so usage lines echo back the
@@ -147,7 +139,7 @@ func newRootCmd() *cobra.Command {
 	if text.usageTemplate != "" {
 		root.SetUsageTemplate(text.usageTemplate)
 	}
-	root.AddCommand(newStatusCmd(), newPingCmd(), newWatchCmd(), newScheduleCmd(), newContinueCmd(), newRedeemCmd(), newBackgroundCmd(), newConfigCmd(), newHooksCmd(), newHookCmd(), newUpgradeCmd(), newUninstallCmd(), newVersionCmd())
+	root.AddCommand(newStatusCmd(), newPingCmd(), newWatchCmd(), newScheduleCmd(), newContinueCmd(), newRedeemCmd(), newBackgroundCmd(), newConfigCmd(), newHooksCmd(), newHookCmd(), newVersionCmd())
 	localizeCompletionCommand(root, text)
 	root.SetHelpCommand(newHelpCommand(text))
 	localizeHelpFlags(root, text)
@@ -287,19 +279,6 @@ func newVersionCmd() *cobra.Command {
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
 			fmt.Fprintf(cmd.OutOrStdout(), "limitping %s\n", version())
-
-			// An upgrade is driven by the binary being replaced, so a version
-			// that predates the alias installs a binary whose --help advertises
-			// `lmp` without ever creating one — and the user has no way to know
-			// a second `upgrade` would fix it. Every released `upgrade` ends by
-			// running `<new binary> version`, which makes this the one place a
-			// new build gets to act on its own behalf after an old one upgraded
-			// it. Cheap (a readlink), idempotent, and bound by the same
-			// ownership rules as install.sh. It reports on stderr so `version`
-			// stdout stays exactly one parseable line.
-			if exe, err := currentExecutable(); err == nil {
-				ensureAlias(exe, cmd.ErrOrStderr())
-			}
 		},
 	}
 }

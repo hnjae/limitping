@@ -103,25 +103,6 @@ func runHooks(out io.Writer, name string, install bool) error {
 	return nil
 }
 
-// removeHooksBestEffort strips limitping's hook entries from every provider's CLI
-// config. Used during uninstall so we don't leave hooks pointing at a deleted
-// binary; failures are reported but never abort the uninstall. Removal matches by
-// predicate, so it works even when the binary path can't be resolved.
-func removeHooksBestEffort(errOut io.Writer) {
-	binPath, _ := os.Executable()
-	for _, p := range []string{"claude", "codex"} {
-		path, spec, err := providerHookSpec(p, binPath)
-		if err != nil {
-			continue
-		}
-		if _, err := applyHooks(path, spec, false); err != nil {
-			fmt.Fprintf(errOut, "warning: removing %s hooks: %v\n", p, err)
-			continue
-		}
-		_ = activity.SetEnabled(p, false)
-	}
-}
-
 // resolveHookProviders maps the CLI arg to the providers that support hooks.
 func resolveHookProviders(name string) []string {
 	switch name {

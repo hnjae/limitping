@@ -1,5 +1,6 @@
 <!--
 SPDX-FileCopyrightText: 2026 wavever
+SPDX-FileCopyrightText: 2026 KIM Hyunjae
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
@@ -38,7 +39,6 @@ The tool may write:
 
 - Anthropic Claude Code OAuth and usage endpoints
 - ChatGPT/Codex OAuth and usage endpoints
-- GitHub releases, when using `install.sh`
 - The LiteLLM pricing dataset on GitHub, for equivalent API-cost estimates
   (per ping and per day)
 

@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2026 wavever
+// SPDX-FileCopyrightText: 2026 KIM Hyunjae
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 package cli
@@ -161,24 +162,6 @@ type cliText struct {
 	hooksRemovedFmt     string
 	hooksNothingFmt     string
 	hooksTrustCodex     string
-
-	updateAvailableFmt      string // current, next
-	updateNotesFmt          string // release notes URL
-	updateOptionUpgrade     string // the upgrade command to run
-	updateOptionSkip        string
-	updateOptionSkipVersion string
-	updateChooseHint        string // keys that drive the option menu
-	updateDismissedFmt      string // version
-	updateFailedFmt         string // error
-
-	upgradeShort      string
-	upgradeCurrentFmt string // current version
-	upgradeForceFlag  string
-	upgradeLong       string
-
-	uninstallShort      string
-	uninstallLong       string
-	uninstallKeepConfig string
 }
 
 func localizedText() cliText {
@@ -471,23 +454,6 @@ Examples:
 	hooksRemovedFmt:   "Removed %s hooks from %s\n",
 	hooksNothingFmt:   "No %s hooks found in %s\n",
 	hooksTrustCodex:   "\nCodex requires a one-time trust: run /hooks inside Codex to enable the new hooks.\n(Claude Code loads its hooks automatically — nothing to do there.)\n",
-
-	updateAvailableFmt:      "\n\u2728 Update available!  %s -> %s\n",
-	updateNotesFmt:          "   Release notes: %s\n\n",
-	updateOptionUpgrade:     "Update now (runs `%s`)",
-	updateOptionSkip:        "Skip",
-	updateOptionSkipVersion: "Skip until next version",
-	updateChooseHint:        "\u2191/\u2193 move \u00b7 Enter confirm \u00b7 Esc skip",
-	updateDismissedFmt:      "   Skipping %s; you'll hear about the next release.\n",
-	updateFailedFmt:         "   %v\n",
-	upgradeShort:            "Upgrade limitping to the latest release",
-	upgradeCurrentFmt:       "limitping %s is already the latest release.\n",
-	upgradeForceFlag:        "reinstall even when already on the latest release",
-	upgradeLong:             "Download the latest GitHub release for this OS/architecture and replace the currently running limitping binary.",
-
-	uninstallShort:      "Remove limitping and its config/cache",
-	uninstallLong:       "Remove the currently running limitping binary and its config/cache directory. Pass --keep-config to preserve config/cache files.",
-	uninstallKeepConfig: "preserve the limitping config/cache directory",
 }
 
 var zhText = cliText{
@@ -755,21 +721,4 @@ Claude Code 会自动加载钩子；Codex 需要一次性信任：在 Codex 中�
 	hooksRemovedFmt:   "已从 %s 移除钩子: %s\n",
 	hooksNothingFmt:   "%s 中未找到钩子: %s\n",
 	hooksTrustCodex:   "\nCodex 需要一次性信任：在 Codex 中运行 /hooks 启用新钩子。\n（Claude Code 会自动加载，无需操作。）\n",
-
-	updateAvailableFmt:      "\n\u2728 有新版本!  %s -> %s\n",
-	updateNotesFmt:          "   更新说明: %s\n\n",
-	updateOptionUpgrade:     "立即更新 (执行 `%s`)",
-	updateOptionSkip:        "跳过",
-	updateOptionSkipVersion: "跳过此版本",
-	updateChooseHint:        "\u2191/\u2193 移动 \u00b7 Enter 确认 \u00b7 Esc 跳过",
-	updateDismissedFmt:      "   已跳过 %s，下个版本会再提醒。\n",
-	updateFailedFmt:         "   %v\n",
-	upgradeShort:            "将 limitping 更新到最新版本",
-	upgradeCurrentFmt:       "limitping %s 已是最新版本。\n",
-	upgradeForceFlag:        "即使已是最新版本也强制重装",
-	upgradeLong:             "下载适用于当前系统和架构的最新 GitHub Release，并替换正在运行的 limitping 二进制文件。",
-
-	uninstallShort:      "删除 limitping 及其配置/缓存",
-	uninstallLong:       "删除当前运行的 limitping 二进制文件及配置/缓存目录。使用 --keep-config 可保留配置/缓存文件。",
-	uninstallKeepConfig: "保留 limitping 配置/缓存目录",
 }
