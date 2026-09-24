@@ -7,7 +7,6 @@ package cli
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -86,7 +85,7 @@ func runStatus(ctx context.Context, out, progress io.Writer, text cliText, provi
 				entries = append(entries, statusJSON{Provider: p.Name(), Error: err.Error()})
 				continue
 			}
-			fmt.Fprintf(out, text.statusErrorFmt, p.Name(), localizedProviderError(text, err))
+			fmt.Fprintf(out, text.statusErrorFmt, p.Name(), err)
 			continue
 		}
 		if jsonOut {
@@ -106,14 +105,6 @@ func runStatus(ctx context.Context, out, progress io.Writer, text cliText, provi
 		return fmt.Errorf("status failed for %d provider(s)", failed)
 	}
 	return nil
-}
-
-func localizedProviderError(text cliText, err error) string {
-	var accessErr *provider.ClaudeSubscriptionAccessError
-	if errors.As(err, &accessErr) && text.statusSubAccessError != "" {
-		return text.statusSubAccessError
-	}
-	return err.Error()
 }
 
 // statusJSON is the stable, documented shape emitted by `status --json`. It is
@@ -463,18 +454,13 @@ func fmtWindow(text cliText, w usage.Window, display string) string {
 		return fmt.Sprintf(text.statusWindowNoResetFmt, bar, pct, word)
 	}
 	return fmt.Sprintf(text.statusWindowFmt,
-		bar, pct, word, fmtDur(text, w.Remaining()), fmtClock(text, w.ResetsAt))
+		bar, pct, word, fmtDur(text, w.Remaining()), fmtClock(w.ResetsAt))
 }
 
-// fmtClock renders the reset wall-clock time with a localized weekday name and
-// the zone it is expressed in.
-func fmtClock(text cliText, t time.Time) string {
+// fmtClock renders the reset wall-clock time and its UTC offset.
+func fmtClock(t time.Time) string {
 	lt := t.Local()
-	clock := lt.Format("Mon 15:04")
-	if text.statusWeekdays != ([7]string{}) {
-		clock = text.statusWeekdays[int(lt.Weekday())] + " " + lt.Format("15:04")
-	}
-	return clock + " " + fmtZone(lt)
+	return lt.Format("Mon 15:04") + " " + fmtZone(lt)
 }
 
 // fmtZone renders t's UTC offset (UTC+8, UTC-5:30, UTC). The offset is used

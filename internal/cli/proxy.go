@@ -373,18 +373,12 @@ func containsClaudeLimitQuestionClean(cleaned []byte) bool {
 	hasAsk := bytes.Contains(clean, []byte("ask user question")) ||
 		bytes.Contains(clean, []byte("askuserquestion"))
 	hasWait := bytes.Contains(clean, []byte("continue waiting")) ||
-		bytes.Contains(clean, []byte("wait until")) ||
-		bytes.Contains(clean, []byte("继续等待")) ||
-		bytes.Contains(clean, []byte("继续等到"))
+		bytes.Contains(clean, []byte("wait until"))
 	hasUpgrade := bytes.Contains(clean, []byte("upgrade to pro")) ||
-		bytes.Contains(clean, []byte("pro plan")) ||
-		bytes.Contains(clean, []byte("升级到 pro")) ||
-		bytes.Contains(clean, []byte("升级 pro"))
+		bytes.Contains(clean, []byte("pro plan"))
 	hasLimit := containsLimitPhraseClean(clean) ||
 		bytes.Contains(clean, []byte("limit reset")) ||
-		bytes.Contains(clean, []byte("limit resets")) ||
-		bytes.Contains(clean, []byte("限制恢复")) ||
-		bytes.Contains(clean, []byte("限额恢复"))
+		bytes.Contains(clean, []byte("limit resets"))
 	return hasAsk && hasLimit && (hasWait || hasUpgrade)
 }
 

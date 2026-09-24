@@ -19,7 +19,6 @@ import (
 // too small to move the used percentage, so the window state has to be read
 // back from the provider afterwards.
 func TestRunPingsReportsTheWindowStateAfterward(t *testing.T) {
-	setLocale(t, "C")
 	text := localizedText()
 	p := fakeStatusProvider{
 		name: "codex",
@@ -47,7 +46,6 @@ func TestRunPingsReportsTheWindowStateAfterward(t *testing.T) {
 // A dry run sends nothing, so there is no new state to read back — and reading
 // it would suggest the window was touched.
 func TestRunPingsDryRunReportsNoWindowState(t *testing.T) {
-	setLocale(t, "C")
 	text := localizedText()
 	read := 0
 	p := fakeStatusProvider{
@@ -69,7 +67,6 @@ func TestRunPingsDryRunReportsNoWindowState(t *testing.T) {
 }
 
 func TestCommandLineNamesTheModelOnlyWhenTheCommandDoesNot(t *testing.T) {
-	setLocale(t, "C")
 	text := localizedText()
 
 	cases := []struct {
@@ -96,13 +93,5 @@ func TestCommandLineNamesTheModelOnlyWhenTheCommandDoesNot(t *testing.T) {
 				t.Fatalf("commandLine() = %q, want %q", got, c.want)
 			}
 		})
-	}
-}
-
-func TestCommandLineIsLocalized(t *testing.T) {
-	setLocale(t, "zh_CN.UTF-8")
-	res := provider.TriggerResult{Command: "codex ok", Model: "gpt-5.6-sol"}
-	if got := commandLine(localizedText(), &res); !strings.Contains(got, "模型: gpt-5.6-sol") {
-		t.Fatalf("commandLine() = %q, want a localized model label", got)
 	}
 }

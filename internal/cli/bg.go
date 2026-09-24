@@ -288,7 +288,7 @@ func runBgStatus(ctx context.Context, out io.Writer) error {
 		cancel()
 		day := <-spendCh
 		if uerr != nil {
-			fmt.Fprintf(out, text.statusErrorFmt, p.Name(), localizedProviderError(text, uerr))
+			fmt.Fprintf(out, text.statusErrorFmt, p.Name(), uerr)
 			fmt.Fprintln(out)
 			continue
 		}

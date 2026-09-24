@@ -291,8 +291,8 @@ func TestSessionInjectorWritesMessageThenEnter(t *testing.T) {
 	var buf bytes.Buffer
 	inj := &sessionInjector{w: &buf}
 	start := time.Now()
-	inj.typeAndSubmit("继续任务", proxyInjectSettle)
-	if got := buf.String(); got != "继续任务\r" {
+	inj.typeAndSubmit("résumé", proxyInjectSettle)
+	if got := buf.String(); got != "résumé\r" {
 		t.Errorf("injected %q, want message + CR", got)
 	}
 	if time.Since(start) < proxyInjectSettle {
@@ -333,8 +333,8 @@ func TestContinueMessageDefaults(t *testing.T) {
 	if got := continueMessage(cfg, "codex"); got != "continue" {
 		t.Errorf("empty codex continue message should fall back to %q, got %q", "continue", got)
 	}
-	cfg.Claude.ContinuePrompt = "继续任务"
-	if got := continueMessage(cfg, "claude"); got != "继续任务" {
+	cfg.Claude.ContinuePrompt = "keep going"
+	if got := continueMessage(cfg, "claude"); got != "keep going" {
 		t.Errorf("custom claude continue message = %q", got)
 	}
 }

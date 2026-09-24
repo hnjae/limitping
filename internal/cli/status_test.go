@@ -113,27 +113,11 @@ func TestRunStatusJSON(t *testing.T) {
 	}
 }
 
-func TestRunStatusLocalizesClaudeSubscriptionAccessError(t *testing.T) {
-	var out bytes.Buffer
-	p := fakeStatusProvider{name: "claude", err: &provider.ClaudeSubscriptionAccessError{}}
-
-	err := runStatus(context.Background(), &out, io.Discard, zhText, []provider.Provider{p}, false, false, "used")
-	if err == nil {
-		t.Fatal("runStatus() error = nil, want provider failure")
-	}
-	got := out.String()
-	if !strings.Contains(got, "Claude 订阅访问不可用") ||
-		!strings.Contains(got, "会员已到期/续费失败") ||
-		!strings.Contains(got, "Anthropic API Key") {
-		t.Fatalf("localized status output = %q", got)
-	}
-}
-
 func TestRunStatusJSONPreservesClaudeSubscriptionError(t *testing.T) {
 	var out bytes.Buffer
 	p := fakeStatusProvider{name: "claude", err: &provider.ClaudeSubscriptionAccessError{}}
 
-	err := runStatus(context.Background(), &out, io.Discard, zhText, []provider.Provider{p}, false, true, "used")
+	err := runStatus(context.Background(), &out, io.Discard, enText, []provider.Provider{p}, false, true, "used")
 	if err == nil {
 		t.Fatal("runStatus() error = nil, want provider failure")
 	}
@@ -183,48 +167,6 @@ func TestPrintUsageMarksMissingWindowNotEnforced(t *testing.T) {
 	}
 	if !strings.Contains(got, "24.0% used") {
 		t.Fatalf("status output = %q, want weekly usage rendered", got)
-	}
-}
-
-func TestPrintUsageRendersChinese(t *testing.T) {
-	var out bytes.Buffer
-	u := &usage.Usage{
-		Provider: "codex",
-		Plan:     "plus",
-		// Weekly-only regime: the 5h window is not enforced.
-		Weekly: usage.Window{
-			UsedPercent:   27,
-			ResetsAt:      time.Now().Add(24 * time.Hour),
-			WindowSeconds: 604800,
-		},
-		ResetCredits: &usage.ResetCredits{
-			AvailableCount: 1,
-			Credits: []usage.ResetCredit{
-				{
-					Status:    "available",
-					GrantedAt: time.Now().Add(-24 * time.Hour),
-					ExpiresAt: time.Now().Add(29*24*time.Hour + 2*time.Hour),
-				},
-			},
-		},
-	}
-
-	printUsage(&out, zhText, u, false, "used", nil)
-
-	got := out.String()
-	for _, want := range []string{
-		"5h     当前未生效",
-		"周     [",
-		"27.0% 已用",
-		"后重置 (周",
-		"重置券 1 张可用",
-		"可用，发放于",
-		"有效期至",
-		"(剩 29d",
-	} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("zh status output = %q, want it to contain %q", got, want)
-		}
 	}
 }
 
@@ -302,20 +244,6 @@ func TestPrintUsageOmitsTodayWithoutLocalTranscripts(t *testing.T) {
 
 	if strings.Contains(out.String(), "today") {
 		t.Fatalf("status output = %q, want no today line without local data", out.String())
-	}
-}
-
-func TestPrintUsageRendersTodayInChinese(t *testing.T) {
-	var out bytes.Buffer
-	u := &usage.Usage{Provider: "claude"}
-
-	printUsage(&out, zhText, u, true, "used", &testDay)
-
-	got := out.String()
-	for _, want := range []string{"今日   1.2M tok  ≈ $3.45", "输入 20.0K · 缓存 读 1.1M / 写 100.0K · 输出 5,000"} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("zh status output = %q, want it to contain %q", got, want)
-		}
 	}
 }
 

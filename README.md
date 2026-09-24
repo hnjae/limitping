@@ -169,6 +169,8 @@ limitping hooks uninstall      # remove those hooks
 limitping version              # print the version (aliases: v, ver)
 ```
 
+CLI help and messages are in English regardless of your locale.
+
 Short aliases are also available for config commands: `limitping c i` for
 `config init` and `limitping c p` for `config path`.
 
@@ -513,7 +515,7 @@ limitping continue claude --dangerously-skip-permissions
 ```
 
 - The resume message is each provider's `continue_prompt` in config (default
-  `"continue"`; set it to e.g. `"继续任务"`). Quit from inside the CLI to exit.
+  `"continue"`; set it to e.g. `"keep going"`). Quit from inside the CLI to exit.
 - It only injects on a genuine recovery edge: the 5h window was maxed (or the
   endpoint reported `limit_reached`, or the CLI printed a limit message) and has
   since clearly reset, and the weekly window isn't also exhausted (per

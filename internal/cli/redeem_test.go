@@ -55,11 +55,9 @@ func TestRedeemOutcomeTextCoversEveryBackendOutcome(t *testing.T) {
 		provider.RedeemNoCredit,
 		provider.RedeemAlreadyRedeemed,
 	} {
-		for _, text := range []cliText{enText, zhText} {
-			got := redeemOutcomeText(text, outcome)
-			if got == "" || got == outcome {
-				t.Fatalf("redeemOutcomeText(%q) = %q, want a translated sentence", outcome, got)
-			}
+		got := redeemOutcomeText(enText, outcome)
+		if got == "" || got == outcome {
+			t.Fatalf("redeemOutcomeText(%q) = %q, want an explanation", outcome, got)
 		}
 	}
 	// An outcome we don't know about must surface as-is rather than read as a

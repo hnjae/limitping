@@ -4,11 +4,6 @@
 
 package cli
 
-import (
-	"os"
-	"strings"
-)
-
 type cliText struct {
 	rootShort     string
 	rootLong      string
@@ -33,10 +28,8 @@ type cliText struct {
 	statusJSONFlag    string
 	statusFetchingFmt string
 
-	// Text-mode usage rendering (status, bg status). The en values must stay
-	// byte-identical to the historical hardcoded output.
+	// Text-mode usage rendering (status, bg status).
 	statusErrorFmt            string // provider name, error
-	statusSubAccessError      string // translation of provider.ClaudeSubscriptionAccessError; empty = print the error's own text
 	statusFiveHourLineFmt     string // formatted window
 	statusWeeklyLineFmt       string // formatted window
 	statusNotEnforced         string
@@ -58,7 +51,6 @@ type cliText struct {
 	statusCreditTimeLayout    string
 	statusListSep             string
 	statusNowWord             string
-	statusWeekdays            [7]string // Sunday first; zero value = Go's "Mon" names
 
 	// Today's local token consumption (status, bg status).
 	statusTodayLineFmt      string // rendered token/cost summary
@@ -164,32 +156,7 @@ type cliText struct {
 	hooksTrustCodex     string
 }
 
-func localizedText() cliText {
-	if isChineseLocale() {
-		return zhText
-	}
-	return enText
-}
-
-func isChineseLocale() bool {
-	// POSIX precedence: the first set variable decides, so LC_ALL=en_US
-	// overrides LANG=zh_CN instead of the zh entry winning from anywhere.
-	for _, key := range []string{"LC_ALL", "LC_MESSAGES", "LANGUAGE", "LANG"} {
-		locale := strings.ToLower(os.Getenv(key))
-		if locale == "" {
-			continue
-		}
-		for _, part := range strings.FieldsFunc(locale, func(r rune) bool {
-			return r == ':' || r == '.' || r == '@' || r == '_' || r == '-'
-		}) {
-			if strings.HasPrefix(part, "zh") {
-				return true
-			}
-		}
-		return false
-	}
-	return false
-}
+func localizedText() cliText { return enText }
 
 var enText = cliText{
 	rootShort: "Keep Claude Code / Codex rate-limit windows back-to-back",
@@ -338,7 +305,7 @@ Arguments:
   cli args...  Optional. Any flags after the provider are forwarded to the CLI
                verbatim, e.g. 'limitping continue codex --yolo'.
 
-The continue message is per-provider continue_prompt in the config (default "continue"; set it to e.g. "继续任务"). Quit from inside the CLI to exit.
+The continue message is per-provider continue_prompt in the config (default "continue"; set it to e.g. "keep going"). Quit from inside the CLI to exit.
 
 Codex reset credits: set auto_redeem = true under [codex] in the config and the same background watcher also spends a banked reset credit that is about to lapse — within 24h when there is usage worth reclaiming, or in its final hour — so a parked session can resume without waiting for the window. Off by default because redeeming is irreversible; 'limitping redeem' spends one by hand.
 
@@ -454,271 +421,4 @@ Examples:
 	hooksRemovedFmt:   "Removed %s hooks from %s\n",
 	hooksNothingFmt:   "No %s hooks found in %s\n",
 	hooksTrustCodex:   "\nCodex requires a one-time trust: run /hooks inside Codex to enable the new hooks.\n(Claude Code loads its hooks automatically — nothing to do there.)\n",
-}
-
-var zhText = cliText{
-	rootShort: "让 Claude Code / Codex 的限额窗口自动接龙",
-	rootLong:  "limitping 会在 AI 编程 Provider 的 5h 限额窗口重置时立即发送 ping，让下一个窗口马上开始并保持对齐。用量读取走零消耗接口；ping 通过官方 CLI 发送。",
-	helpFlag:  "显示此命令的帮助",
-	usageTemplate: `用法:{{if .Runnable}}
-  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
-  {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
-
-别名:
-  {{.NameAndAliases}}{{end}}{{if .HasExample}}
-
-示例:
-{{.Example}}{{end}}{{if .HasAvailableSubCommands}}{{$cmds := .Commands}}{{if eq (len .Groups) 0}}
-
-可用命令:{{range $cmds}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
-  {{rpad .NameAndAliases 24}} {{.Short}}{{end}}{{end}}{{else}}{{range $group := .Groups}}
-
-{{.Title}}{{range $cmds}}{{if (and (eq .GroupID $group.ID) (or .IsAvailableCommand (eq .Name "help")))}}
-  {{rpad .NameAndAliases 24}} {{.Short}}{{end}}{{end}}{{end}}{{if not .AllChildCommandsHaveGroup}}
-
-其他命令:{{range $cmds}}{{if (and (eq .GroupID "") (or .IsAvailableCommand (eq .Name "help")))}}
-  {{rpad .NameAndAliases 24}} {{.Short}}{{end}}{{end}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
-
-选项:
-{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
-
-全局选项:
-{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
-
-其他帮助主题:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
-  {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
-
-使用 "{{.CommandPath}} [command] --help" 查看命令详情。{{end}}
-`,
-
-	helpCommandShort: "查看任意命令的帮助",
-	helpCommandLong:  "查看应用中任意命令的帮助。\n输入 limitping help [command] 查看完整详情。",
-	helpUnknownTopic: "未知帮助主题",
-
-	completionShort:      "生成 shell 补全脚本",
-	completionLong:       "生成 limitping 的 shell 补全脚本。\n\n运行 `limitping completion [bash|zsh|fish|powershell] --help` 查看指定 shell 的用法。",
-	completionNoDescFlag: "禁用补全说明",
-	completionShellShort: "生成 %s 补全脚本",
-	completionShellLong:  "生成 limitping 的 %s 补全脚本。",
-
-	versionShort: "打印版本号",
-
-	statusShort: "查看当前 5h/周用量和重置倒计时，不消耗额度",
-	statusLong: `查看所有已启用 Provider 的当前 5h 和周用量。此命令只通过零消耗接口读取用量，不会发送 ping，也不会消耗模型额度。
-
-"今日" 一行统计本机 Claude Code / Codex 会话从本地零点起消耗的 token，数据来自这些 CLI 写在磁盘上的会话记录，并按官方 API 价格折算——也就是不用订阅时这一天要花多少钱。其他机器或网页版的用量不在这些记录里。加 -v 可查看分模型明细。`,
-	statusVerboseFlag: "打印原始 JSON 响应",
-	statusJSONFlag:    "以 JSON 格式输出用量，而非文本",
-	statusFetchingFmt: "正在查询 %s 用量...\n",
-
-	statusErrorFmt:            "%-7s  错误: %v\n",
-	statusSubAccessError:      "Claude 订阅访问不可用（可能是会员已到期/续费失败，或组织管理员禁用了 Claude Code）；请恢复订阅，或在 Claude Code 中改用 Anthropic API Key",
-	statusFiveHourLineFmt:     "  5h     %s\n",
-	statusWeeklyLineFmt:       "  周     %s\n",
-	statusNotEnforced:         "当前未生效",
-	statusWindowFmt:           "%s %5.1f%% %s  %s 后重置 (%s)",
-	statusWindowNoResetFmt:    "%s %5.1f%% %s  (无活跃窗口)",
-	statusUsedWord:            "已用",
-	statusRemainingWord:       "剩余",
-	statusCreditsUnlimited:    "  credits 不限量\n",
-	statusCreditsFmt:          "  credits %s\n",
-	statusResetCreditsOneFmt:  "  重置券 %d 张可用\n",
-	statusResetCreditsManyFmt: "  重置券 %d 张可用\n",
-	statusCreditAvailable:     "可用",
-	statusCreditRedeemed:      "已兑换",
-	statusCreditExpired:       "已过期",
-	statusCreditGrantedFmt:    "发放于 %s",
-	statusCreditExpiresFmt:    "有效期至 %s",
-	statusCreditExpiresInFmt:  " (剩 %s)",
-	statusCreditRedeemedFmt:   "兑换于 %s",
-	statusCreditTimeLayout:    "01-02 15:04",
-	statusListSep:             "，",
-	statusNowWord:             "现在",
-	statusWeekdays:            [7]string{"周日", "周一", "周二", "周三", "周四", "周五", "周六"},
-
-	statusTodayLineFmt:      "  今日   %s\n",
-	statusTodayTokensFmt:    "%s tok",
-	statusTodayCostFmt:      "  ≈ $%s",
-	statusTodayBreakdownFmt: "         输入 %s · 缓存 读 %s / 写 %s · 输出 %s\n",
-	statusTodayModelFmt:     "         %-26s %s\n",
-	statusTodayUnknownModel: "未知模型",
-
-	pingShort: "用最小消息立即触发 Provider 的限额窗口",
-	pingLong: `通过向指定 Provider 发送最小消息，立即触发一个限额窗口。
-
-参数:
-  provider  可选。取值: claude、codex、all。
-            默认是 all，会 ping 所有已启用的 Provider。
-
-示例:
-  limitping ping
-  limitping p claude
-  limitping ping codex --dry-run`,
-	pingDryRunFlag:  "只打印将执行的命令，不真正发送",
-	pingWouldRunFmt: "%-7s 将执行: %s\n",
-	pingSendingFmt:  "\r%-7s %c 发送中… %s",
-	pingModelFmt:    "  (模型: %s)",
-	pingFailedFmt:   "%-7s ✗ 失败 (耗时 %s): %v\n",
-	pingSuccessFmt:  "%-7s ✓ 已 ping (%s%s)\n",
-
-	watchShort: "以前台守护方式运行，并在每个 Provider 的 5h 窗口重置时自动 ping",
-	watchLong: `以前台守护方式运行。某个 Provider 的 5h 窗口重置后，limitping 会发送最小消息来开启下一个窗口。
-
-参数:
-  provider  可选。取值: claude、codex、all。
-            默认是 all，会监测所有已启用的 Provider。
-
-Codex 重置卡: 在配置的 [codex] 下设置 auto_redeem = true，watch 还会在重置卡临近过期时自动用掉它——剩余有效期 24h 内且确实有用量可回收，或进入最后 1 小时。因为兑换不可撤销，默认关闭；手动兑换用 'limitping redeem'。
-
-示例:
-  limitping watch
-  limitping w claude
-  limitping watch --live
-  limitping watch --dry-run`,
-	watchDryRunFlag:        "只记录何时会触发，不真正发送",
-	watchLiveFlag:          "显示实时心电图状态行（会增加耗电）",
-	watchAlreadyRunningFmt: "watch 已在运行（pid %d，Provider %s%s，启动于 %s）；请先停止已有 watcher 再启动新的",
-
-	scheduleShort: "按固定间隔或每日指定时间执行 ping",
-	scheduleLong: `按用户指定的时间表执行 ping。它和 watch 不同: schedule 跟随你的墙钟时间,不会等待 Provider 的限额重置时刻。
-
-参数:
-  provider  可选。取值: claude、codex、all。
-            默认是 all，会 ping 所有已启用的 Provider。
-
-示例:
-  limitping schedule codex --at 05:00
-  limitping schedule --at 05:00 --at 13:00 --at 21:00
-  limitping schedule codex --every 5h --dry-run`,
-	scheduleEveryFlag:  "按固定间隔重复执行（例如 5h、90m）",
-	scheduleAtFlag:     "按每日本地时间 HH:MM 执行；可重复传入，也可用逗号写多个",
-	scheduleStartedFmt: "已为 %s 启动定时 ping（%s%s）。\n",
-	scheduleNextFmt:    "下次定时 ping: %s（还有 %s）。\n",
-	scheduleRunFmt:     "===== 定时 ping: %s =====\n",
-	scheduleErrorFmt:   "本次定时执行完成，但有错误: %v\n",
-
-	continueShort: "代理该 Provider 的 CLI，并在 5h 限额恢复时自动续跑任务",
-	continueLong: `通过 limitping 启动该 Provider 的交互式 CLI。你的终端会被原样透传——照常使用 Codex / Claude Code——同时 limitping 在后台监测用量，当 5h 限额（曾打满）恢复时自动发送续跑消息，让长任务自己接着跑，而不是停在限额处。
-
-参数:
-  provider     必填。取值: claude、codex。
-  cli args...  可选。Provider 后面的参数会原样转发给该 CLI，例如
-               'limitping continue codex --yolo'。
-
-续跑消息取配置中各 Provider 的 continue_prompt（默认 "continue"，可改成如 "继续任务"）。退出请用该 CLI 自带的退出方式。
-
-Codex 重置卡: 在配置的 [codex] 下设置 auto_redeem = true，后台的同一个 watcher 还会在重置卡临近过期时自动用掉它——剩余有效期 24h 内且确实有用量可回收，或进入最后 1 小时——这样停在限额处的会话不必干等窗口重置。因为兑换不可撤销，默认关闭；手动兑换用 'limitping redeem'。
-
-示例:
-  limitping continue codex
-  limitping continue codex --yolo
-  limitping continue claude --dangerously-skip-permissions`,
-	continueBadProvider: "无效的 Provider（应为 claude 或 codex）：",
-	continueStartedFmt:  "正在代理 %s，5h 限额恢复后会自动续跑（消息：%q）。照常使用；退出请用该 CLI 自带的退出方式。\n",
-
-	redeemShort: "立即使用一张已到账的 Codex 限额重置卡",
-	redeemLong: `消耗一张 'limitping status' 中显示的 Codex 重置卡，重置它能覆盖的限额窗口。
-
-兑换不可撤销。由后端决定用哪一张；当前没有可重置的窗口时后端会以 "nothing to reset" 拒绝，因此不会白烧一张卡。
-
-在配置的 [codex] 下设置 auto_redeem = true，可让 'watch' 和 'continue' 在卡临近过期时自动使用（剩余有效期 24h 内且确实有用量可回收，或进入最后 1 小时）。
-
-示例:
-  limitping redeem --dry-run
-  limitping redeem`,
-	redeemDryRunFlag:    "只显示会用掉哪一张，不实际消耗",
-	redeemNoneAvailable: "没有可用的重置卡",
-	redeemPlanFmt:       "codex   即将使用 1 张重置卡（有效期至 %s，剩 %s）\n",
-	redeemDryRunNote:    "dry run: 未消耗任何重置卡\n",
-	redeemOutcomeFmt:    "codex   %s\n",
-	redeemDone:          "已兑换 —— 符合条件的限额窗口已重置",
-	redeemNothing:       "当前没有可重置的限额窗口，本次未消耗重置卡",
-	redeemNoCredit:      "账号没有可用的重置卡",
-	redeemAlready:       "这次兑换此前已经完成过",
-	redeemUnknownFmt:    "后端返回了未知结果: %s",
-
-	bgShort: "在后台运行 watch —— start | stop | status | logs",
-	bgLong: `以脱离终端的方式在后台运行 watch 守护进程，关闭终端后仍会在每个 5h 窗口重置时持续 ping。
-
-子命令:
-  start [provider]   启动后台监听（也支持 --dry-run）
-  stop               停止后台监听
-  status             查看是否在运行（直接运行 bg 也是这个）
-  logs               查看日志（-f 持续跟踪，-n N 查看最后 N 行）
-
-同一时间只会运行一个监听（前台或后台）。后台进程会脱离到独立会话，关闭终端后依然存活——但开机不会自启（如需开机自启，请使用 launchd/systemd 等服务）。`,
-	bgExample:    "  limitping bg start          # 在后台启动\n  limitping bg start codex    # 只监测 Codex\n  limitping bg status         # 是否在运行?(等同于 limitping bg)\n  limitping bg logs -f        # 持续查看日志\n  limitping bg stop           # 停止",
-	bgStartShort: "以后台进程方式启动 watch",
-	bgStartLong: `在后台（脱离终端）启动 watch 守护进程并立即返回，释放当前终端。输出会写入配置目录下的日志文件。
-
-参数:
-  provider  可选。取值: claude、codex、all。
-            默认是 all，会监测所有已启用的 Provider。
-
-示例:
-  limitping bg start
-  limitping bg start claude
-  limitping bg start --dry-run`,
-	bgStatusShort:    "查看后台监听是否在运行",
-	bgStopShort:      "停止后台监听",
-	bgLogsShort:      "查看后台监听的日志输出",
-	bgLogsFollowFlag: "持续跟踪日志输出（类似 tail -f）",
-	bgLogsLinesFlag:  "显示最后多少行日志",
-
-	bgHintStart:          "启动: limitping bg start [claude|codex] [--dry-run]",
-	bgHintManage:         "管理: limitping bg logs -f  |  limitping bg stop",
-	bgNotRunning:         "后台监听：未在运行。",
-	bgClearedStaleFmt:    "后台监听：未在运行（已清理失效的 pid %d）。\n",
-	bgRunningFmt:         "后台监听：正在运行（pid %d）。\n",
-	bgFieldWatching:      "监测",
-	bgFieldUptime:        "运行时长",
-	bgFieldStarted:       "启动于",
-	bgFieldLogs:          "日志",
-	bgFieldPings:         "ping 记录",
-	bgPingNone:           "本次后台监听启动后暂无记录",
-	bgPingSummaryFmt:     "共 %d 次（成功 %d，失败 %d，dry-run %d）\n",
-	bgPingShowingLastFmt: "显示最近 %d 条",
-	bgPingSucceeded:      "成功",
-	bgPingFailed:         "失败",
-	bgPingDryRun:         "dry-run",
-	bgStartedFmt:         "已在后台启动监听（pid %d，Provider %s%s）。\n",
-	bgLogPathFmt:         "日志：%s\n",
-	bgStartFollowUp:      "用 `limitping bg status` 查看状态，用 `limitping bg stop` 停止。",
-	bgStopWasStaleFmt:    "后台监听原本未在运行（已清理失效的 pid %d）。\n",
-	bgStoppedFmt:         "已停止后台监听（pid %d）。\n",
-	bgNoLogYetFmt:        "暂无日志文件：%s\n",
-
-	configShort:     "管理配置文件",
-	configInitShort: "写入默认配置文件",
-	configInitForce: "覆盖已有配置",
-	configPathShort: "打印配置文件路径",
-
-	hooksShort: "管理 Claude/Codex 钩子，精确判断会话是否正在运行",
-	hooksLong: `管理用于判断 Claude Code 或 Codex 会话是否真正处于对话进行中（而非仅仅进程存在）的钩子。
-
-安装后，limitping 会在你正在使用时推迟 ping，并在一轮对话结束后恢复。未安装钩子时，limitping 会跳过该检查，窗口一重置就直接 ping。安装脚本会自动装好这些钩子。`,
-	hooksInstallShort: "在 Claude/Codex 配置中注册 limitping 的钩子",
-	hooksInstallLong: `在 ~/.claude/settings.json 和 ~/.codex/hooks.json 中注册 limitping 的钩子（保留已有配置，并写入 .bak 备份）。
-
-参数:
-  provider  可选。取值: claude、codex、all。默认是 all。
-
-Claude Code 会自动加载钩子；Codex 需要一次性信任：在 Codex 中运行 /hooks 启用它们。
-
-示例:
-  limitping hooks install
-  limitping hooks install claude`,
-	hooksUninstallShort: "从 Claude/Codex 配置中移除 limitping 的钩子",
-	hooksUninstallLong: `仅从 ~/.claude/settings.json 和 ~/.codex/hooks.json 中移除 limitping 的钩子条目，保留你的其他钩子（会写入 .bak 备份）。
-
-参数:
-  provider  可选。取值: claude、codex、all。默认是 all。
-
-示例:
-  limitping hooks uninstall
-  limitping hooks uninstall codex`,
-	hooksInstalledFmt: "已安装 %s 钩子 → %s\n",
-	hooksRemovedFmt:   "已从 %s 移除钩子: %s\n",
-	hooksNothingFmt:   "%s 中未找到钩子: %s\n",
-	hooksTrustCodex:   "\nCodex 需要一次性信任：在 Codex 中运行 /hooks 启用新钩子。\n（Claude Code 会自动加载，无需操作。）\n",
 }

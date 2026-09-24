@@ -140,7 +140,7 @@ func commandLine(text cliText, res *provider.TriggerResult) string {
 
 func report(out io.Writer, text cliText, name string, start time.Time, res *provider.TriggerResult, err error) {
 	if err != nil {
-		fmt.Fprintf(out, text.pingFailedFmt, name, elapsed(start), localizedProviderError(text, err))
+		fmt.Fprintf(out, text.pingFailedFmt, name, elapsed(start), err)
 		return
 	}
 	fmt.Fprintf(out, text.pingSuccessFmt, name, elapsed(start), usageSuffix(res))
