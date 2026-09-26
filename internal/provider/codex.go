@@ -520,7 +520,7 @@ type codexCatalogModel struct {
 }
 
 // codexModelCatalog reads the models the Codex CLI last cached for this
-// account. It returns nil when the cache is missing or unparseable.
+// account. It returns nil when the cache is missing or unparsable.
 func codexModelCatalog() []codexCatalogModel {
 	data, err := os.ReadFile(codexModelsCachePath())
 	if err != nil {

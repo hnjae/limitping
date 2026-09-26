@@ -4,10 +4,7 @@
 
 ## Checks
 
-- [ ] `gofmt -l .` prints nothing
-- [ ] `go build ./...`
-- [ ] `go vet ./...`
-- [ ] `go test ./...`
+- [ ] `nix flake check` passes
 
 ## Safety
 

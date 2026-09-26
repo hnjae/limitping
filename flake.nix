@@ -60,6 +60,36 @@
               typos.enable = true;
               reuse.enable = true;
             };
+            checks = {
+              limitping = pkgs.buildGoModule {
+                pname = "limitping";
+                version = "unstable";
+                src = ./.;
+                vendorHash = "sha256-M6lE7Dk/f8+PLY+8uS5lbEhPnez0OUDmyWdZnwnIQ+Y=";
+                subPackages = [ "cmd/limitping" ];
+                env.CGO_ENABLED = "0";
+                nativeBuildInputs = [ pkgs.stdenv.cc ];
+                doCheck = true;
+                checkPhase = ''
+                  runHook preCheck
+                  go vet ./...
+                  CGO_ENABLED=1 go test -race -coverprofile=coverage.out -covermode=atomic ./...
+                  go tool cover -func=coverage.out
+                  runHook postCheck
+                '';
+              };
+
+              goreleaser =
+                pkgs.runCommand "limitping-goreleaser-check"
+                  {
+                    nativeBuildInputs = [ pkgs.goreleaser ];
+                  }
+                  ''
+                    cd ${./.}
+                    goreleaser check
+                    touch "$out"
+                  '';
+            };
 
             devShells.default = pkgs.mkShellNoCC {
               inputsFrom = [ config.treefmt.build.devShell ];

@@ -439,10 +439,7 @@ Issues and PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Before submitting:
 
 ```sh
-gofmt -l .        # should print nothing
-go build ./...
-go vet ./...
-go test ./...
+nix flake check
 ```
 
 Providers are isolated in `internal/provider` behind a small `Provider`

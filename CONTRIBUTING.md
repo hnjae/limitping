@@ -10,19 +10,15 @@ Thanks for helping improve `limitping`.
 
 ## Development Setup
 
-Nix with flakes enabled is required. The supported source build is `nix build`;
-run development commands inside `nix develop`. Provider-specific tests
-may also require the provider CLI or credentials.
+Nix with flakes enabled is required. `nix flake check` is the canonical CI command; it builds the CLI and runs formatting, Go analysis/tests, and release-config validation. Use `nix develop` for interactive Go and repository-hook commands. Provider-specific tests may also require the provider CLI or credentials.
 
-Build the CLI, then enter the development shell for checks:
+Run the full CI check set from the repository root:
 
 ```sh
-nix build
-nix develop
-prek run --all-files
-go vet ./...
-go test ./...
+nix flake check
 ```
+
+Inside `nix develop`, run repository hooks with `prek run --all-files`.
 
 ## Local Smoke Tests
 
@@ -53,13 +49,9 @@ validated without real credentials or paid quota.
 ## Pull Request Checklist
 
 - [ ] The change is focused and described clearly
-- [ ] `prek run --all-files` passes
-- [ ] `nix build` passes
-- [ ] `go vet ./...` passes inside `nix develop`
-- [ ] `go test ./...` passes inside `nix develop`
+- [ ] `nix flake check` passes
 - [ ] README or config examples are updated when user-facing behavior changes
-- [ ] No credentials, raw usage responses, or private account metadata are
-      included in tests, fixtures, logs, screenshots, or docs
+- [ ] No credentials, raw usage responses, or private account metadata are included in tests, fixtures, logs, screenshots, or docs
 
 ## Security Reports
 

@@ -628,7 +628,7 @@ func TestCodexTriggerSkipsModelCheckWithoutCatalog(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := c.Trigger(context.Background(), true); err != nil {
-		t.Fatalf("trigger with an unparseable models cache: %v", err)
+		t.Fatalf("trigger with an unparsable models cache: %v", err)
 	}
 }
 

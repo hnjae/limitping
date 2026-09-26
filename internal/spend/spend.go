@@ -118,7 +118,7 @@ func startOfDay(t time.Time) time.Time {
 }
 
 // withinDay reports whether an RFC3339 transcript stamp falls in [start, end).
-// An unparseable or missing stamp is excluded: a record that cannot be dated
+// An unparsable or missing stamp is excluded: a record that cannot be dated
 // cannot be attributed to today.
 func withinDay(stamp string, start, end time.Time) bool {
 	if stamp == "" {
