@@ -27,40 +27,56 @@
           inputs.treefmt-nix.flakeModule
         ];
 
-        perSystem = { config, pkgs, ... }: {
-          treefmt = {
-            projectRootFile = "flake.nix";
-            programs.gofmt.enable = true;
-            programs.nixfmt.enable = true;
-            programs.taplo.enable = true;
-            settings.formatter.rumdl = {
-              command = "${pkgs.rumdl}/bin/rumdl";
-              options = [ "fmt" ];
-              includes = [ "*.md" ];
+        perSystem =
+          {
+            config,
+            pkgs,
+            lib,
+            ...
+          }:
+          {
+            treefmt.projectRootFile = "flake.nix";
+            treefmt.programs = {
+              gofmt.enable = true;
+              nixfmt.enable = true;
+              rumdl-format.enable = true;
+              taplo.enable = true;
+              yamlfmt.enable = true;
             };
-            programs.yamlfmt.enable = true;
-          };
 
-          pre-commit.settings = {
-            package = pkgs.prek;
-            hooks.treefmt.enable = true;
-          };
+            pre-commit.settings.package = pkgs.prek;
+            pre-commit.settings.hooks = {
+              cocogitto = {
+                enable = true;
+                name = "cog verify";
+                description = "Lint commit messages with Cocogitto.";
+                package = pkgs.cocogitto;
+                entry = "${lib.getExe pkgs.cocogitto} verify --file";
+                stages = [ "commit-msg" ];
+              };
+              detect-private-keys.enable = true;
+              treefmt.enable = true;
+              typos.enable = true;
+            };
 
-          devShells.default = pkgs.mkShellNoCC {
-            inputsFrom = [ config.treefmt.build.devShell ];
-            packages = [
-              pkgs.go
-              pkgs.prek
-            ]
-            ++ config.pre-commit.settings.enabledPackages;
+            devShells.default = pkgs.mkShellNoCC {
+              inputsFrom = [ config.treefmt.build.devShell ];
+              packages = [
+                pkgs.go
+              ]
+              ++ config.pre-commit.settings.enabledPackages;
 
-            shellHook = config.pre-commit.shellHook + ''
-              if [ ! -e treefmt.toml ] || [ -L treefmt.toml ]; then
-                ln -sfn ${config.treefmt.build.configFile} treefmt.toml
-              fi
-            '';
+              shellHook = lib.concatLines [
+                config.pre-commit.shellHook
+                # sh
+                ''
+                  if [ ! -e treefmt.toml ] || [ -L treefmt.toml ]; then
+                    ln -sfn ${config.treefmt.build.configFile} treefmt.toml
+                  fi
+                ''
+              ];
+            };
           };
-        };
       };
 
       partitionedAttrs = {
