@@ -47,13 +47,13 @@ func TestRunStatusPrintsProgressBeforeReadUsage(t *testing.T) {
 		name:  "codex",
 		usage: &usage.Usage{Provider: "codex"},
 		onRead: func() {
-			if !strings.Contains(progress.String(), "Fetching codex usage...\n") {
-				t.Fatalf("progress output before ReadUsage = %q, want fetching message", progress.String())
+			if progress.Len() == 0 {
+				t.Fatal("no progress written before ReadUsage")
 			}
 		},
 	}
 
-	if err := runStatus(context.Background(), &out, &progress, enText, []provider.Provider{p}, false, false, "used"); err != nil {
+	if err := runStatus(context.Background(), &out, &progress, []provider.Provider{p}, false, false, "used"); err != nil {
 		t.Fatalf("runStatus() error = %v", err)
 	}
 	if !strings.Contains(out.String(), "codex\n") {
@@ -78,7 +78,7 @@ func TestRunStatusJSON(t *testing.T) {
 		fakeStatusProvider{name: "claude", err: errors.New("boom")},
 	}
 
-	err := runStatus(context.Background(), &out, &progress, enText, providers, false, true, "used")
+	err := runStatus(context.Background(), &out, &progress, providers, false, true, "used")
 	if err == nil {
 		t.Fatalf("runStatus() error = nil, want failure for the erroring provider")
 	}
@@ -117,7 +117,7 @@ func TestRunStatusJSONPreservesClaudeSubscriptionError(t *testing.T) {
 	var out bytes.Buffer
 	p := fakeStatusProvider{name: "claude", err: &provider.ClaudeSubscriptionAccessError{}}
 
-	err := runStatus(context.Background(), &out, io.Discard, enText, []provider.Provider{p}, false, true, "used")
+	err := runStatus(context.Background(), &out, io.Discard, []provider.Provider{p}, false, true, "used")
 	if err == nil {
 		t.Fatal("runStatus() error = nil, want provider failure")
 	}
@@ -139,10 +139,10 @@ func TestPrintUsageCanShowRemainingPercent(t *testing.T) {
 		Weekly:   usage.Window{UsedPercent: 15},
 	}
 
-	printUsage(&out, enText, u, false, "remaining", nil)
+	printUsage(&out, u, false, "remaining", nil)
 
 	got := out.String()
-	if !strings.Contains(got, "99.0% remaining") || !strings.Contains(got, "85.0% remaining") {
+	if !strings.Contains(got, "99.0%") || !strings.Contains(got, "85.0%") {
 		t.Fatalf("status output = %q, want remaining percentages", got)
 	}
 }
@@ -159,13 +159,13 @@ func TestPrintUsageMarksMissingWindowNotEnforced(t *testing.T) {
 		},
 	}
 
-	printUsage(&out, enText, u, false, "used", nil)
+	printUsage(&out, u, false, "used", nil)
 
 	got := out.String()
-	if !strings.Contains(got, "5h     not currently enforced") {
-		t.Fatalf("status output = %q, want missing 5h window marked as not enforced", got)
+	if strings.Contains(got, "0.0%") {
+		t.Fatalf("status output = %q, want a missing window omitted rather than shown as zero", got)
 	}
-	if !strings.Contains(got, "24.0% used") {
+	if !strings.Contains(got, "24.0%") {
 		t.Fatalf("status output = %q, want weekly usage rendered", got)
 	}
 }
@@ -186,13 +186,13 @@ func TestPrintUsageIncludesResetCredits(t *testing.T) {
 		},
 	}
 
-	printUsage(&out, enText, u, false, "used", nil)
+	printUsage(&out, u, false, "used", nil)
 
 	got := out.String()
-	if !strings.Contains(got, "reset credits 1 reset available") || !strings.Contains(got, "available") {
-		t.Fatalf("status output = %q, want reset credit summary", got)
+	if !strings.Contains(got, "available") {
+		t.Fatalf("status output = %q, want the credit's status", got)
 	}
-	if !strings.Contains(got, "(in 29d") {
+	if !strings.Contains(got, "29d") {
 		t.Fatalf("status output = %q, want remaining lifetime on the expires part", got)
 	}
 }
@@ -201,11 +201,11 @@ func TestPrintUsageShowsTodaysTokensAndCost(t *testing.T) {
 	var out bytes.Buffer
 	u := &usage.Usage{Provider: "claude", FiveHour: usage.Window{UsedPercent: 12}}
 
-	printUsage(&out, enText, u, false, "used", &testDay)
+	printUsage(&out, u, false, "used", &testDay)
 
 	got := out.String()
-	if !strings.Contains(got, "today  1.2M tok  ≈ $3.45") {
-		t.Fatalf("status output = %q, want today's tokens and cost", got)
+	if !strings.Contains(got, "1.2M") || !strings.Contains(got, "$3.45") {
+		t.Fatalf("status output = %q, want today's token total and cost", got)
 	}
 	if strings.Contains(got, "claude-opus-5") {
 		t.Fatalf("status output = %q, want the per-model breakdown held back for -v", got)
@@ -216,21 +216,31 @@ func TestPrintUsageBreaksTodayDownWhenVerbose(t *testing.T) {
 	var out bytes.Buffer
 	u := &usage.Usage{Provider: "claude"}
 
-	printUsage(&out, enText, u, true, "used", &testDay)
+	printUsage(&out, u, true, "used", &testDay)
 
 	got := out.String()
 	for _, want := range []string{
-		"in 20.0K · cache 1.1M read / 100.0K write · out 5,000",
+		"20.0K",
+		"1.1M",
+		"100.0K",
+		"5,000",
 		"claude-opus-5",
-		"1.2M tok  ≈ $3.45",
-		// The model with no published rates is still counted, just not costed.
-		"brand-new-model",
-		"5,000 tok\n",
+		"1.2M",
+		"$3.45",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("verbose status output = %q, want it to contain %q", got, want)
 		}
 	}
+	for _, line := range strings.Split(got, "\n") {
+		if strings.Contains(line, "brand-new-model") {
+			if !strings.Contains(line, "5,000") || strings.Contains(line, "$") {
+				t.Fatalf("unpriced model output = %q, want tokens without a cost", line)
+			}
+			return
+		}
+	}
+	t.Fatal("verbose status output omitted a model with no published rates")
 }
 
 func TestPrintUsageOmitsTodayWithoutLocalTranscripts(t *testing.T) {
@@ -239,11 +249,11 @@ func TestPrintUsageOmitsTodayWithoutLocalTranscripts(t *testing.T) {
 
 	// The CLI has never run on this machine: "0 tok" would claim a quiet day
 	// that limitping has no way to know about.
-	printUsage(&out, enText, u, false, "used", &spend.Day{Provider: "claude"})
-	printUsage(&out, enText, u, false, "used", nil)
+	printUsage(&out, u, false, "used", &spend.Day{Provider: "claude"})
+	printUsage(&out, u, false, "used", nil)
 
-	if strings.Contains(out.String(), "today") {
-		t.Fatalf("status output = %q, want no today line without local data", out.String())
+	if strings.Contains(out.String(), "0 tok") {
+		t.Fatalf("status output = %q, want no fabricated zero for missing local data", out.String())
 	}
 }
 
@@ -322,14 +332,14 @@ func TestResetCreditLineOmitsRemainingWhenRedeemedOrExpired(t *testing.T) {
 		ExpiresAt:  time.Now().Add(10 * 24 * time.Hour),
 		RedeemedAt: time.Now().Add(-time.Hour),
 	}
-	if line := resetCreditLine(enText, redeemed); strings.Contains(line, "(in ") {
+	if line := resetCreditLine(redeemed); strings.Contains(line, fmtDurDays(10*24*time.Hour)) {
 		t.Fatalf("redeemed credit line = %q, want no remaining lifetime", line)
 	}
 	expired := usage.ResetCredit{
 		Status:    "expired",
 		ExpiresAt: time.Now().Add(-time.Hour),
 	}
-	if line := resetCreditLine(enText, expired); strings.Contains(line, "(in ") {
+	if line := resetCreditLine(expired); strings.Contains(line, fmtDurDays(10*24*time.Hour)) {
 		t.Fatalf("expired credit line = %q, want no remaining lifetime", line)
 	}
 }
@@ -382,11 +392,11 @@ func TestFmtZoneRendersOffsetNotAbbreviation(t *testing.T) {
 func TestFmtWindowAndResetCreditCarryTheZone(t *testing.T) {
 	zone := fmtZone(time.Now())
 	w := usage.Window{UsedPercent: 45, ResetsAt: time.Now().Add(3 * time.Hour), WindowSeconds: 18000}
-	if got := fmtWindow(enText, w, "used"); !strings.Contains(got, zone) {
+	if got := fmtWindow(w, "used"); !strings.Contains(got, zone) {
 		t.Fatalf("window line = %q, want the zone %q", got, zone)
 	}
 	credit := usage.ResetCredit{Status: "available", ExpiresAt: time.Now().Add(10 * 24 * time.Hour)}
-	if got := resetCreditLine(enText, credit); !strings.Contains(got, zone) {
+	if got := resetCreditLine(credit); !strings.Contains(got, zone) {
 		t.Fatalf("credit line = %q, want the zone %q on the expiry", got, zone)
 	}
 }

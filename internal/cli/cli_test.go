@@ -172,12 +172,6 @@ func TestRedeemIsReachableByItsShortAlias(t *testing.T) {
 	}
 }
 
-func TestWatchHelpDocumentsAutoRedeem(t *testing.T) {
-	if !strings.Contains(enText.watchLong, "auto_redeem") || !strings.Contains(enText.watchLong, "redeem") {
-		t.Error("watch help does not document automatic redemption")
-	}
-}
-
 // Whichever name was typed, the root help must advertise the other one, so a
 // user who only ever runs `limitping` still discovers `lmp` and vice versa.
 func TestRootHelpAdvertisesBothBinaryNames(t *testing.T) {

@@ -55,14 +55,14 @@ func TestRedeemOutcomeTextCoversEveryBackendOutcome(t *testing.T) {
 		provider.RedeemNoCredit,
 		provider.RedeemAlreadyRedeemed,
 	} {
-		got := redeemOutcomeText(enText, outcome)
+		got := redeemOutcomeText(outcome)
 		if got == "" || got == outcome {
 			t.Fatalf("redeemOutcomeText(%q) = %q, want an explanation", outcome, got)
 		}
 	}
 	// An outcome we don't know about must surface as-is rather than read as a
 	// successful redemption.
-	if got := redeemOutcomeText(enText, "brand_new_code"); !strings.Contains(got, "brand_new_code") {
+	if got := redeemOutcomeText("brand_new_code"); !strings.Contains(got, "brand_new_code") {
 		t.Fatalf("unknown outcome = %q, want the raw code reported", got)
 	}
 }

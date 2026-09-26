@@ -123,7 +123,6 @@ func Execute() error {
 }
 
 func newRootCmd() *cobra.Command {
-	text := localizedText()
 	root := &cobra.Command{
 		Use: invokedName(),
 		// Purely informational — the root has no parent to resolve an alias
@@ -131,28 +130,57 @@ func newRootCmd() *cobra.Command {
 		// the same section that already advertises per-command aliases, so
 		// whichever name you typed, the other one is discoverable.
 		Aliases:       []string{alternateName()},
-		Short:         text.rootShort,
-		Long:          text.rootLong,
+		Short:         "Keep Claude Code / Codex rate-limit windows back-to-back",
+		Long:          "limitping pings your AI coding provider the moment its 5h rate-limit window resets, so the next window starts immediately and stays aligned. Usage is read via zero-quota endpoints; pings go through the official CLIs.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	if text.usageTemplate != "" {
-		root.SetUsageTemplate(text.usageTemplate)
-	}
+	root.SetUsageTemplate(usageTemplate)
 	root.AddCommand(newStatusCmd(), newPingCmd(), newWatchCmd(), newRedeemCmd(), newConfigCmd(), newVersionCmd())
-	localizeCompletionCommand(root, text)
-	root.SetHelpCommand(newHelpCommand(text))
-	localizeHelpFlags(root, text)
-	localizeInvocations(root)
+	configureCompletionCommand(root)
+	root.SetHelpCommand(newHelpCommand())
+	configureHelpFlags(root)
+	rewriteInvocations(root)
 	return root
 }
 
-// localizeInvocations rewrites the `limitping <command>` examples in the help
+const usageTemplate = `Usage:{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
+
+Aliases:
+  {{.NameAndAliases}}{{end}}{{if .HasExample}}
+
+Examples:
+{{.Example}}{{end}}{{if .HasAvailableSubCommands}}{{$cmds := .Commands}}{{if eq (len .Groups) 0}}
+
+Available Commands:{{range $cmds}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
+  {{rpad .NameAndAliases 24}} {{.Short}}{{end}}{{end}}{{else}}{{range $group := .Groups}}
+
+{{.Title}}{{range $cmds}}{{if (and (eq .GroupID $group.ID) (or .IsAvailableCommand (eq .Name "help")))}}
+  {{rpad .NameAndAliases 24}} {{.Short}}{{end}}{{end}}{{end}}{{if not .AllChildCommandsHaveGroup}}
+
+Additional Commands:{{range $cmds}}{{if (and (eq .GroupID "") (or .IsAvailableCommand (eq .Name "help")))}}
+  {{rpad .NameAndAliases 24}} {{.Short}}{{end}}{{end}}{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
+
+Flags:
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
+
+Global Flags:
+{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
+
+Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
+  {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
+
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
+
+// rewriteInvocations rewrites the `limitping <command>` examples in the help
 // text to whichever name the binary was invoked as, so they stay copy-pasteable
 // under the alias. Only invocations are touched: a bare "limitping" is the
 // product name and stays put.
 // A no-op unless the alias was used.
-func localizeInvocations(root *cobra.Command) {
+func rewriteInvocations(root *cobra.Command) {
 	name := invokedName()
 	if name == "limitping" {
 		return
@@ -185,6 +213,81 @@ func localizeInvocations(root *cobra.Command) {
 	}
 }
 
+func newHelpCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "help [command]",
+		Short: "Help about any command",
+		Long:  "Help provides help for any command in the application.\nType limitping help [command] for full details.",
+		Run: func(cmd *cobra.Command, args []string) {
+			target, _, err := cmd.Root().Find(args)
+			if target == nil || err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "%s %#q\n", "Unknown help topic", args)
+				_ = cmd.Root().Usage()
+				return
+			}
+			target.InitDefaultHelpFlag()
+			configureHelpFlag(target)
+			_ = target.Help()
+		},
+	}
+	cmd.InitDefaultHelpFlag()
+	configureHelpFlag(cmd)
+	return cmd
+}
+
+func configureHelpFlags(cmd *cobra.Command) {
+	cmd.InitDefaultHelpFlag()
+	configureHelpFlag(cmd)
+	for _, child := range cmd.Commands() {
+		configureHelpFlags(child)
+	}
+}
+
+func configureHelpFlag(cmd *cobra.Command) {
+	if flag := cmd.Flags().Lookup("help"); flag != nil {
+		flag.Usage = "help for this command"
+	}
+}
+
+func configureCompletionCommand(root *cobra.Command) {
+	root.InitDefaultCompletionCmd()
+	cmd := findChildCommand(root, "completion")
+	if cmd == nil {
+		return
+	}
+	cmd.Short = "Generate shell completion scripts"
+	cmd.Long = "Generate shell completion scripts for limitping.\n\nRun `limitping completion [bash|zsh|fish|powershell] --help` for shell-specific usage."
+
+	for _, child := range cmd.Commands() {
+		child.Short = fmt.Sprintf("Generate the %s completion script", child.Name())
+		child.Long = fmt.Sprintf("Generate the %s completion script for limitping.", child.Name())
+		if flag := child.Flags().Lookup("no-descriptions"); flag != nil {
+			flag.Usage = "disable completion descriptions"
+		}
+	}
+}
+
+func findChildCommand(parent *cobra.Command, name string) *cobra.Command {
+	for _, child := range parent.Commands() {
+		if child.Name() == name {
+			return child
+		}
+	}
+	return nil
+}
+
+func newVersionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:     "version",
+		Aliases: []string{"v", "ver"},
+		Short:   "Print the version",
+		Args:    cobra.NoArgs,
+		Run: func(cmd *cobra.Command, _ []string) {
+			fmt.Fprintf(cmd.OutOrStdout(), "limitping %s\n", version())
+		},
+	}
+}
+
 // invocationPattern matches "limitping " followed by a real command name or
 // alias from the tree (at a word boundary, so the prose "limitping watches" is
 // left alone), plus the flag forms.
@@ -205,82 +308,6 @@ func invocationPattern(root *cobra.Command) *regexp.Regexp {
 	}
 	collect(root)
 	return regexp.MustCompile(`\blimitping ((?:` + strings.Join(tokens, "|") + `)\b)`)
-}
-
-func newHelpCommand(text cliText) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "help [command]",
-		Short: text.helpCommandShort,
-		Long:  text.helpCommandLong,
-		Run: func(cmd *cobra.Command, args []string) {
-			target, _, err := cmd.Root().Find(args)
-			if target == nil || err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "%s %#q\n", text.helpUnknownTopic, args)
-				_ = cmd.Root().Usage()
-				return
-			}
-			target.InitDefaultHelpFlag()
-			localizeHelpFlag(target, text)
-			_ = target.Help()
-		},
-	}
-	cmd.InitDefaultHelpFlag()
-	localizeHelpFlag(cmd, text)
-	return cmd
-}
-
-func localizeHelpFlags(cmd *cobra.Command, text cliText) {
-	cmd.InitDefaultHelpFlag()
-	localizeHelpFlag(cmd, text)
-	for _, child := range cmd.Commands() {
-		localizeHelpFlags(child, text)
-	}
-}
-
-func localizeHelpFlag(cmd *cobra.Command, text cliText) {
-	if flag := cmd.Flags().Lookup("help"); flag != nil {
-		flag.Usage = text.helpFlag
-	}
-}
-
-func localizeCompletionCommand(root *cobra.Command, text cliText) {
-	root.InitDefaultCompletionCmd()
-	cmd := findChildCommand(root, "completion")
-	if cmd == nil {
-		return
-	}
-	cmd.Short = text.completionShort
-	cmd.Long = text.completionLong
-
-	for _, child := range cmd.Commands() {
-		child.Short = fmt.Sprintf(text.completionShellShort, child.Name())
-		child.Long = fmt.Sprintf(text.completionShellLong, child.Name())
-		if flag := child.Flags().Lookup("no-descriptions"); flag != nil {
-			flag.Usage = text.completionNoDescFlag
-		}
-	}
-}
-
-func findChildCommand(parent *cobra.Command, name string) *cobra.Command {
-	for _, child := range parent.Commands() {
-		if child.Name() == name {
-			return child
-		}
-	}
-	return nil
-}
-
-func newVersionCmd() *cobra.Command {
-	text := localizedText()
-	return &cobra.Command{
-		Use:     "version",
-		Aliases: []string{"v", "ver"},
-		Short:   text.versionShort,
-		Args:    cobra.NoArgs,
-		Run: func(cmd *cobra.Command, _ []string) {
-			fmt.Fprintf(cmd.OutOrStdout(), "limitping %s\n", version())
-		},
-	}
 }
 
 // buildProvider constructs a single provider from config.

@@ -91,7 +91,7 @@ func releaseWatchLock(path string, pid int) {
 
 func watchAlreadyRunningError(st watchLockState) error {
 	started := st.StartedAt.Format("2006-01-02 15:04:05")
-	return fmt.Errorf(localizedText().watchAlreadyRunningFmt, st.PID, st.Provider, dryRunNote(st.DryRun), started)
+	return fmt.Errorf("watch already running (pid %d, provider %s%s, started %s)", st.PID, st.Provider, dryRunNote(st.DryRun), started)
 }
 
 // dryRunNote renders the watch mode in an already-running error.

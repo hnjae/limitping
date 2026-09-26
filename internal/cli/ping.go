@@ -20,12 +20,20 @@ import (
 
 func newPingCmd() *cobra.Command {
 	var dryRun bool
-	text := localizedText()
 	cmd := &cobra.Command{
-		Use:       "ping [provider]",
-		Aliases:   []string{"p"},
-		Short:     text.pingShort,
-		Long:      text.pingLong,
+		Use:     "ping [provider]",
+		Aliases: []string{"p"},
+		Short:   "Trigger a provider window now with a minimal message",
+		Long: `Trigger a rate-limit window immediately by sending the minimal message for the selected provider.
+
+Arguments:
+  provider  Optional. One of: claude, codex, all.
+            Defaults to all, which pings every enabled provider.
+
+Examples:
+  limitping ping
+  limitping p claude
+  limitping ping codex --dry-run`,
 		Args:      cobra.MatchAll(cobra.MaximumNArgs(1), cobra.OnlyValidArgs),
 		ValidArgs: []string{"claude", "codex", "all"},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -41,11 +49,11 @@ func newPingCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runPings(cmd.Context(), cmd.OutOrStdout(), text, providers,
+			return runPings(cmd.Context(), cmd.OutOrStdout(), providers,
 				dryRun, isTerminal(os.Stdout), cfg.UsageDisplay)
 		},
 	}
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, text.pingDryRunFlag)
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the command without sending")
 	return cmd
 }
 
@@ -54,10 +62,10 @@ func newPingCmd() *cobra.Command {
 // without it the command only answers "the request went out" while the question
 // actually being asked is "did my window start" — which the ping's own output
 // cannot show, because a ping is far too small to move the used percentage.
-func runPings(ctx context.Context, out io.Writer, text cliText, providers []provider.Provider, dryRun, tty bool, display string) error {
+func runPings(ctx context.Context, out io.Writer, providers []provider.Provider, dryRun, tty bool, display string) error {
 	var firstErr error
 	for _, p := range providers {
-		if err := runPing(ctx, out, text, p, dryRun, tty); err != nil && firstErr == nil {
+		if err := runPing(ctx, out, p, dryRun, tty); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}
@@ -68,13 +76,13 @@ func runPings(ctx context.Context, out io.Writer, text cliText, providers []prov
 	// Reported even when a ping failed: that is exactly when the window state
 	// is worth seeing. A failing status read is printed inline by runStatus and
 	// must not turn a successful ping into a failed command.
-	_ = runStatus(ctx, out, io.Discard, text, providers, false, false, display)
+	_ = runStatus(ctx, out, io.Discard, providers, false, false, display)
 	return firstErr
 }
 
 // runPing triggers one provider with live feedback so the user can see what the
 // CLI is doing during the (often multi-second) shell-out.
-func runPing(parent context.Context, out io.Writer, text cliText, p provider.Provider, dryRun, tty bool) error {
+func runPing(parent context.Context, out io.Writer, p provider.Provider, dryRun, tty bool) error {
 	name := p.Name()
 
 	// Resolve the exact command first (a dry-run Trigger executes nothing).
@@ -83,11 +91,11 @@ func runPing(parent context.Context, out io.Writer, text cliText, p provider.Pro
 		return err
 	}
 	if dryRun {
-		fmt.Fprintf(out, text.pingWouldRunFmt, name, commandLine(text, dry))
+		fmt.Fprintf(out, "%-7s would run: %s\n", name, commandLine(dry))
 		return nil
 	}
 
-	fmt.Fprintf(out, "%-7s → %s\n", name, commandLine(text, dry))
+	fmt.Fprintf(out, "%-7s → %s\n", name, commandLine(dry))
 
 	ctx, cancel := context.WithTimeout(parent, 3*time.Minute)
 	defer cancel()
@@ -106,7 +114,7 @@ func runPing(parent context.Context, out io.Writer, text cliText, p provider.Pro
 	if !tty {
 		// No spinner on non-terminals; just wait and report.
 		o := <-done
-		report(out, text, name, start, o.res, o.err)
+		report(out, name, start, o.res, o.err)
 		return o.err
 	}
 
@@ -118,10 +126,10 @@ func runPing(parent context.Context, out io.Writer, text cliText, p provider.Pro
 		select {
 		case o := <-done:
 			fmt.Fprint(out, "\r\033[K") // clear the spinner line
-			report(out, text, name, start, o.res, o.err)
+			report(out, name, start, o.res, o.err)
 			return o.err
 		case <-ticker.C:
-			fmt.Fprintf(out, text.pingSendingFmt, name, frames[i%len(frames)], elapsed(start))
+			fmt.Fprintf(out, "\r%-7s %c sending… %s", name, frames[i%len(frames)], elapsed(start))
 			i++
 		}
 	}
@@ -131,19 +139,19 @@ func runPing(parent context.Context, out io.Writer, text cliText, p provider.Pro
 // itself doesn't. limitping only passes -m/--model when one is configured; with
 // it unset the CLI picks the model, and the bare command would leave the user
 // unable to tell which model the ping just spent quota on.
-func commandLine(text cliText, res *provider.TriggerResult) string {
+func commandLine(res *provider.TriggerResult) string {
 	if res.Model == "" || strings.Contains(res.Command, res.Model) {
 		return res.Command
 	}
-	return res.Command + fmt.Sprintf(text.pingModelFmt, res.Model)
+	return res.Command + fmt.Sprintf("  (model: %s)", res.Model)
 }
 
-func report(out io.Writer, text cliText, name string, start time.Time, res *provider.TriggerResult, err error) {
+func report(out io.Writer, name string, start time.Time, res *provider.TriggerResult, err error) {
 	if err != nil {
-		fmt.Fprintf(out, text.pingFailedFmt, name, elapsed(start), err)
+		fmt.Fprintf(out, "%-7s ✗ failed after %s: %v\n", name, elapsed(start), err)
 		return
 	}
-	fmt.Fprintf(out, text.pingSuccessFmt, name, elapsed(start), usageSuffix(res))
+	fmt.Fprintf(out, "%-7s ✓ pinged (%s%s)\n", name, elapsed(start), usageSuffix(res))
 }
 
 // usageSuffix renders the token/cost tail, e.g. ", 32,934 tok, $0.0110".

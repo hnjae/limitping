@@ -25,17 +25,20 @@ import (
 // fetch, so it normally costs nothing in wall time; the cap is there so a huge
 // or unreadable transcript history cannot hold up the whole command.
 const spendTimeout = 20 * time.Second
+const creditTimeLayout = "Jan 02 15:04"
 
 func newStatusCmd() *cobra.Command {
 	var verbose bool
 	var jsonOut bool
-	text := localizedText()
+
 	cmd := &cobra.Command{
 		Use:     "status",
 		Aliases: []string{"s", "stat"},
-		Short:   text.statusShort,
-		Long:    text.statusLong,
-		Args:    cobra.NoArgs,
+		Short:   "Show current 5h/weekly usage and reset countdowns without using quota",
+		Long: `Show current 5h and weekly usage for every enabled provider. This command only reads usage data from zero-quota endpoints; it does not send a ping or consume model quota.
+
+The 'today' line totals the tokens this machine's Claude Code / Codex sessions have used since local midnight, read from the transcripts those CLIs write to disk, and prices them at published API rates — what the day would have cost without the subscription. Work done from another machine or from the web app is not in those logs. Add -v for the per-model breakdown.`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := config.Load()
 			if err != nil {
@@ -45,15 +48,15 @@ func newStatusCmd() *cobra.Command {
 			if len(providers) == 0 {
 				return fmt.Errorf("no providers enabled in config")
 			}
-			return runStatus(cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr(), text, providers, verbose, jsonOut, cfg.UsageDisplay)
+			return runStatus(cmd.Context(), cmd.OutOrStdout(), cmd.ErrOrStderr(), providers, verbose, jsonOut, cfg.UsageDisplay)
 		},
 	}
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, text.statusVerboseFlag)
-	cmd.Flags().BoolVar(&jsonOut, "json", false, text.statusJSONFlag)
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "print the raw JSON response")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "output usage as JSON instead of text")
 	return cmd
 }
 
-func runStatus(ctx context.Context, out, progress io.Writer, text cliText, providers []provider.Provider, verbose, jsonOut bool, display string) error {
+func runStatus(ctx context.Context, out, progress io.Writer, providers []provider.Provider, verbose, jsonOut bool, display string) error {
 	if progress == nil {
 		progress = io.Discard
 	}
@@ -72,9 +75,7 @@ func runStatus(ctx context.Context, out, progress io.Writer, text cliText, provi
 		spendCh := make(chan *spend.Day, 1)
 		go func() { spendCh <- todaySpend(ctx, p.Name()) }()
 
-		if text.statusFetchingFmt != "" {
-			fmt.Fprintf(progress, text.statusFetchingFmt, p.Name())
-		}
+		fmt.Fprintf(progress, "Fetching %s usage...\n", p.Name())
 		readCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		u, err := p.ReadUsage(readCtx)
 		cancel()
@@ -85,14 +86,14 @@ func runStatus(ctx context.Context, out, progress io.Writer, text cliText, provi
 				entries = append(entries, statusJSON{Provider: p.Name(), Error: err.Error()})
 				continue
 			}
-			fmt.Fprintf(out, text.statusErrorFmt, p.Name(), err)
+			fmt.Fprintf(out, "%-7s  error: %v\n", p.Name(), err)
 			continue
 		}
 		if jsonOut {
 			entries = append(entries, newStatusJSON(u, verbose, day))
 			continue
 		}
-		printUsage(out, text, u, verbose, display, day)
+		printUsage(out, u, verbose, display, day)
 	}
 	if jsonOut {
 		enc := json.NewEncoder(out)
@@ -277,24 +278,24 @@ func timeJSON(t time.Time) string {
 	return t.Format(time.RFC3339)
 }
 
-func printUsage(out io.Writer, text cliText, u *usage.Usage, verbose bool, display string, day *spend.Day) {
+func printUsage(out io.Writer, u *usage.Usage, verbose bool, display string, day *spend.Day) {
 	display = normalizeUsageDisplay(display)
 	plan := u.Plan
 	if plan != "" {
 		plan = " (" + plan + ")"
 	}
 	fmt.Fprintf(out, "%s%s\n", u.Provider, plan)
-	fmt.Fprintf(out, text.statusFiveHourLineFmt, fmtWindow(text, u.FiveHour, display))
-	fmt.Fprintf(out, text.statusWeeklyLineFmt, fmtWindow(text, u.Weekly, display))
-	printToday(out, text, day, verbose)
+	fmt.Fprintf(out, "  5h     %s\n", fmtWindow(u.FiveHour, display))
+	fmt.Fprintf(out, "  weekly %s\n", fmtWindow(u.Weekly, display))
+	printToday(out, day, verbose)
 	if u.Credits != nil && (u.Credits.HasCredits || u.Credits.Unlimited) {
 		if u.Credits.Unlimited {
-			fmt.Fprint(out, text.statusCreditsUnlimited)
+			fmt.Fprint(out, "  credits unlimited\n")
 		} else {
-			fmt.Fprintf(out, text.statusCreditsFmt, u.Credits.Balance)
+			fmt.Fprintf(out, "  credits %s\n", u.Credits.Balance)
 		}
 	}
-	printResetCredits(out, text, u.ResetCredits)
+	printResetCredits(out, u.ResetCredits)
 	if verbose {
 		fmt.Fprintf(out, "  raw: %s\n", string(u.Raw))
 	}
@@ -319,32 +320,32 @@ func todaySpend(ctx context.Context, name string) *spend.Day {
 // place a subscription's actual consumption becomes a number. Nothing is
 // printed for a provider whose CLI has never run on this machine: silence is
 // honest there, while "0 tok" would claim a quiet day.
-func printToday(out io.Writer, text cliText, day *spend.Day, verbose bool) {
+func printToday(out io.Writer, day *spend.Day, verbose bool) {
 	if day == nil || !day.Available {
 		return
 	}
-	fmt.Fprintf(out, text.statusTodayLineFmt, fmtSpend(text, day.Tokens.Total(), day.CostUSD))
+	fmt.Fprintf(out, "  today  %s\n", fmtSpend(day.Tokens.Total(), day.CostUSD))
 	if !verbose || day.Empty() {
 		return
 	}
-	fmt.Fprintf(out, text.statusTodayBreakdownFmt,
+	fmt.Fprintf(out, "         in %s · cache %s read / %s write · out %s\n",
 		humanTokens(day.Tokens.Input), humanTokens(day.Tokens.CacheRead),
 		humanTokens(day.Tokens.CacheWrite), humanTokens(day.Tokens.Output))
 	for _, m := range day.Models {
 		name := m.Model
 		if name == "" {
-			name = text.statusTodayUnknownModel
+			name = "unknown model"
 		}
-		fmt.Fprintf(out, text.statusTodayModelFmt, name, fmtSpend(text, m.Tokens.Total(), m.CostUSD))
+		fmt.Fprintf(out, "         %-26s %s\n", name, fmtSpend(m.Tokens.Total(), m.CostUSD))
 	}
 }
 
 // fmtSpend renders "47.9M tok  ≈ $38.15", dropping the cost when the model's
 // rates are unknown (an unpublished or brand-new model).
-func fmtSpend(text cliText, tokens int, costUSD float64) string {
-	s := fmt.Sprintf(text.statusTodayTokensFmt, humanTokens(tokens))
+func fmtSpend(tokens int, costUSD float64) string {
+	s := fmt.Sprintf("%s tok", humanTokens(tokens))
 	if costUSD > 0 {
-		s += fmt.Sprintf(text.statusTodayCostFmt, fmtUSD(costUSD))
+		s += fmt.Sprintf("  ≈ $%s", fmtUSD(costUSD))
 	}
 	return s
 }
@@ -373,24 +374,24 @@ func fmtUSD(v float64) string {
 	return fmt.Sprintf("%.2f", v)
 }
 
-func printResetCredits(out io.Writer, text cliText, rc *usage.ResetCredits) {
+func printResetCredits(out io.Writer, rc *usage.ResetCredits) {
 	if rc == nil || (rc.AvailableCount == 0 && len(rc.Credits) == 0) {
 		return
 	}
-	countFmt := text.statusResetCreditsManyFmt
+	countFmt := "  reset credits %d resets available\n"
 	if rc.AvailableCount == 1 {
-		countFmt = text.statusResetCreditsOneFmt
+		countFmt = "  reset credits %d reset available\n"
 	}
 	fmt.Fprintf(out, countFmt, rc.AvailableCount)
 	for _, c := range rc.Credits {
-		line := resetCreditLine(text, c)
+		line := resetCreditLine(c)
 		if line != "" {
 			fmt.Fprintf(out, "    - %s\n", line)
 		}
 	}
 }
 
-func resetCreditLine(text cliText, c usage.ResetCredit) string {
+func resetCreditLine(c usage.ResetCredit) string {
 	status := c.Status
 	if status == "" {
 		switch {
@@ -402,59 +403,44 @@ func resetCreditLine(text cliText, c usage.ResetCredit) string {
 			status = "available"
 		}
 	}
-	parts := []string{creditStatusWord(text, status)}
+	parts := []string{status}
 	if !c.GrantedAt.IsZero() {
-		parts = append(parts, fmt.Sprintf(text.statusCreditGrantedFmt, c.GrantedAt.Local().Format(text.statusCreditTimeLayout)))
+		parts = append(parts, fmt.Sprintf("granted %s", c.GrantedAt.Local().Format(creditTimeLayout)))
 	}
 	if !c.ExpiresAt.IsZero() {
 		// The zone is stated on the expiry — the one date on this line that is a
 		// deadline to act on — and carries the line's other stamps with it.
 		expires := c.ExpiresAt.Local()
-		part := fmt.Sprintf(text.statusCreditExpiresFmt, expires.Format(text.statusCreditTimeLayout)+" "+fmtZone(expires))
+		part := fmt.Sprintf("expires %s", expires.Format(creditTimeLayout)+" "+fmtZone(expires))
 		// Remaining lifetime, so an unredeemed credit about to lapse is
 		// visible at a glance. Meaningless once redeemed or expired.
 		if remaining := time.Until(c.ExpiresAt); remaining > 0 && c.RedeemedAt.IsZero() {
-			part += fmt.Sprintf(text.statusCreditExpiresInFmt, fmtDurDays(text, remaining))
+			part += fmt.Sprintf(" (in %s)", fmtDurDays(remaining))
 		}
 		parts = append(parts, part)
 	}
 	if !c.RedeemedAt.IsZero() {
-		parts = append(parts, fmt.Sprintf(text.statusCreditRedeemedFmt, c.RedeemedAt.Local().Format(text.statusCreditTimeLayout)))
+		parts = append(parts, fmt.Sprintf("redeemed %s", c.RedeemedAt.Local().Format(creditTimeLayout)))
 	}
-	return strings.Join(parts, text.statusListSep)
+	return strings.Join(parts, ", ")
 }
 
-// creditStatusWord localizes the well-known reset-credit statuses; anything
-// else (a new API value) passes through untranslated.
-func creditStatusWord(text cliText, status string) string {
-	switch status {
-	case "available":
-		return text.statusCreditAvailable
-	case "redeemed":
-		return text.statusCreditRedeemed
-	case "expired":
-		return text.statusCreditExpired
-	default:
-		return status
-	}
-}
-
-func fmtWindow(text cliText, w usage.Window, display string) string {
+func fmtWindow(w usage.Window, display string) string {
 	if w.Missing() {
-		return text.statusNotEnforced
+		return "not currently enforced"
 	}
 	display = normalizeUsageDisplay(display)
 	pct := displayedPercent(w, display)
 	bar := usageBar(pct)
-	word := text.statusUsedWord
+	word := "used"
 	if display == "remaining" {
-		word = text.statusRemainingWord
+		word = "remaining"
 	}
 	if w.ResetsAt.IsZero() {
-		return fmt.Sprintf(text.statusWindowNoResetFmt, bar, pct, word)
+		return fmt.Sprintf("%s %5.1f%% %-9s (no active window)", bar, pct, word)
 	}
-	return fmt.Sprintf(text.statusWindowFmt,
-		bar, pct, word, fmtDur(text, w.Remaining()), fmtClock(w.ResetsAt))
+	return fmt.Sprintf("%s %5.1f%% %-9s resets in %-8s (%s)",
+		bar, pct, word, fmtDur(w.Remaining()), fmtClock(w.ResetsAt))
 }
 
 // fmtClock renders the reset wall-clock time and its UTC offset.
@@ -529,9 +515,9 @@ func usageBar(pct float64) string {
 // fmtDurDays renders long spans with a day component (e.g. 11d16h) — reset
 // credits live for 30 days, where pure hours would be unreadable — and falls
 // back to fmtDur below one day.
-func fmtDurDays(text cliText, d time.Duration) string {
+func fmtDurDays(d time.Duration) string {
 	if d < 24*time.Hour {
-		return fmtDur(text, d)
+		return fmtDur(d)
 	}
 	days := int(d / (24 * time.Hour))
 	hours := int(d % (24 * time.Hour) / time.Hour)
@@ -541,9 +527,9 @@ func fmtDurDays(text cliText, d time.Duration) string {
 	return fmt.Sprintf("%dd%dh", days, hours)
 }
 
-func fmtDur(text cliText, d time.Duration) string {
+func fmtDur(d time.Duration) string {
 	if d <= 0 {
-		return text.statusNowWord
+		return "now"
 	}
 	d = d.Round(time.Minute)
 	h := d / time.Hour

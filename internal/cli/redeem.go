@@ -22,26 +22,33 @@ import (
 // credits, and the automatic path (auto_redeem) is opt-in.
 func newRedeemCmd() *cobra.Command {
 	var dryRun bool
-	text := localizedText()
 	cmd := &cobra.Command{
 		Use:     "redeem",
 		Aliases: []string{"r"},
-		Short:   text.redeemShort,
-		Long:    text.redeemLong,
-		Args:    cobra.NoArgs,
+		Short:   "Spend a banked Codex rate-limit reset credit now",
+		Long: `Consume one of the Codex reset credits shown by 'limitping status', resetting the rate-limit windows it is eligible for.
+
+Redeeming is irreversible. The backend decides which credit to spend and refuses with "nothing to reset" when no window is currently eligible, so a credit is never burned for nothing.
+
+Set auto_redeem = true under [codex] in the config to let 'watch' spend a credit on its own once it is close to expiring (within 24h with real usage to reclaim, or in its final hour).
+
+Examples:
+  limitping redeem --dry-run
+  limitping redeem`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := config.Load()
 			if err != nil {
 				return err
 			}
-			return runRedeem(cmd.Context(), cmd.OutOrStdout(), text, provider.NewCodex(cfg.Codex), dryRun)
+			return runRedeem(cmd.Context(), cmd.OutOrStdout(), provider.NewCodex(cfg.Codex), dryRun)
 		},
 	}
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, text.redeemDryRunFlag)
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show which credit would be spent without consuming it")
 	return cmd
 }
 
-func runRedeem(ctx context.Context, out io.Writer, text cliText, p *provider.Codex, dryRun bool) error {
+func runRedeem(ctx context.Context, out io.Writer, p *provider.Codex, dryRun bool) error {
 	readCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	u, err := p.ReadUsage(readCtx)
 	cancel()
@@ -50,18 +57,18 @@ func runRedeem(ctx context.Context, out io.Writer, text cliText, p *provider.Cod
 	}
 	credit, ok := nextRedeemableCredit(u, time.Now())
 	if !ok {
-		return fmt.Errorf("%s", text.redeemNoneAvailable)
+		return fmt.Errorf("%s", "no reset credits available to redeem")
 	}
 
 	// The expiry is unknown when only the count survived (see below).
 	if !credit.ExpiresAt.IsZero() {
 		expires := credit.ExpiresAt.Local()
-		fmt.Fprintf(out, text.redeemPlanFmt,
-			expires.Format(text.statusCreditTimeLayout)+" "+fmtZone(expires),
-			fmtDurDays(text, time.Until(credit.ExpiresAt)))
+		fmt.Fprintf(out, "codex   redeeming 1 reset credit (expires %s, in %s)\n",
+			expires.Format(creditTimeLayout)+" "+fmtZone(expires),
+			fmtDurDays(time.Until(credit.ExpiresAt)))
 	}
 	if dryRun {
-		fmt.Fprint(out, text.redeemDryRunNote)
+		fmt.Fprint(out, "dry run: nothing was consumed\n")
 		return nil
 	}
 
@@ -69,7 +76,7 @@ func runRedeem(ctx context.Context, out io.Writer, text cliText, p *provider.Cod
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, text.redeemOutcomeFmt, redeemOutcomeText(text, outcome))
+	fmt.Fprintf(out, "codex   %s\n", redeemOutcomeText(outcome))
 	return nil
 }
 
@@ -98,17 +105,17 @@ func nextRedeemableCredit(u *usage.Usage, now time.Time) (usage.ResetCredit, boo
 	return target, found
 }
 
-func redeemOutcomeText(text cliText, outcome string) string {
+func redeemOutcomeText(outcome string) string {
 	switch outcome {
 	case provider.RedeemReset:
-		return text.redeemDone
+		return "redeemed — the eligible rate-limit windows were reset"
 	case provider.RedeemNothingToReset:
-		return text.redeemNothing
+		return "no rate-limit window is currently eligible for a reset; the credit was not spent"
 	case provider.RedeemNoCredit:
-		return text.redeemNoCredit
+		return "the account has no reset credits available"
 	case provider.RedeemAlreadyRedeemed:
-		return text.redeemAlready
+		return "this redemption already completed earlier"
 	default:
-		return fmt.Sprintf(text.redeemUnknownFmt, outcome)
+		return fmt.Sprintf("unexpected outcome from the backend: %s", outcome)
 	}
 }
