@@ -8,7 +8,6 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSE.md)
 [![CI](https://github.com/hnjae/limitping/actions/workflows/ci.yml/badge.svg)](https://github.com/hnjae/limitping/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/hnjae/limitping?include_prereleases&sort=semver)](https://github.com/hnjae/limitping/releases)
 ![Go](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)
 

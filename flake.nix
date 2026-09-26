@@ -78,17 +78,6 @@
                   runHook postCheck
                 '';
               };
-
-              goreleaser =
-                pkgs.runCommand "limitping-goreleaser-check"
-                  {
-                    nativeBuildInputs = [ pkgs.goreleaser ];
-                  }
-                  ''
-                    cd ${./.}
-                    goreleaser check
-                    touch "$out"
-                  '';
             };
 
             devShells.default = pkgs.mkShellNoCC {

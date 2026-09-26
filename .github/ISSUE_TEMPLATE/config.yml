@@ -1,9 +1,0 @@
-# SPDX-FileCopyrightText: 2026 wavever
-# SPDX-FileCopyrightText: 2026 KIM Hyunjae
-# SPDX-License-Identifier: AGPL-3.0-or-later
----
-blank_issues_enabled: true
-contact_links:
-  - name: Security reports
-    url: https://github.com/hnjae/limitping/security/advisories/new
-    about: Please report vulnerabilities privately when GitHub private reporting is enabled.
