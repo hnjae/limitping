@@ -42,6 +42,7 @@
               rumdl-format.enable = true;
               taplo.enable = true;
               yamlfmt.enable = true;
+              just.enable = true;
             };
 
             pre-commit.settings.package = pkgs.prek;
