@@ -6,22 +6,18 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 # `limitping`
 
+This fork is based on upstream [CCLimitPing](https://github.com/wavever/CCLimitPing); fork licensing is documented in [LICENSE.md](LICENSE.md).
+
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSE.md)
 [![CI](https://github.com/hnjae/limitping/actions/workflows/ci.yml/badge.svg)](https://github.com/hnjae/limitping/actions/workflows/ci.yml)
 ![Go](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)
 
-Start the next **Claude Code** or **Codex** rate-limit window the moment the
-previous one resets.
+Start the next **Claude Code** or **Codex** rate-limit window the moment the previous one resets.
 
-Claude Code and Codex subscription limits run on **5-hour rolling windows**
-(plus a weekly cap). A fresh 5h window does not start just because the previous
-one reset; it starts when you send the first billable request. If that
-happens hours later, the gap is wasted and your window schedule drifts.
+Claude Code and Codex subscription limits run on **5-hour rolling windows** (plus a weekly cap). A fresh 5h window does not start just because the previous one reset; it starts when you send the first billable request. If that happens hours later, the gap is wasted and your window schedule drifts.
 
-`limitping` watches the reset time and sends one tiny request through the
-official provider CLI right after rollover. Run `ping` once or keep `watch`
-in the foreground to maintain your window chain.
+`limitping` watches the reset time and sends one tiny request through the official provider CLI right after rollover. Run `ping` once or keep `watch` in the foreground to maintain your window chain.
 
 ```text
 claude  ✓ pinged (6.6s)
@@ -33,38 +29,26 @@ codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 - Keeps 5h windows continuous by pinging as soon as a reset is safely available.
 - Runs as one-shot `ping` or foreground `watch`.
 - Shows 5h and weekly usage and reset countdowns from read-only usage endpoints.
-- Counts today's tokens and what they would have cost at API rates, read from the
-  CLIs' own local session transcripts — the number the percentages never show.
-- Triggers Claude Code and Codex through their official CLIs using your existing
-  logged-in credentials.
-- Spends Codex reset credits before they lapse: `limitping redeem` cashes one in
-  by hand, and `auto_redeem = true` lets `watch` spend one on its own once
-  it is close to expiring — a banked reset is worth nothing after it expires.
-  Off by default, because redeeming is irreversible.
+- Counts today's tokens and what they would have cost at API rates, read from the CLIs' own local session transcripts — the number the percentages never show.
+- Triggers Claude Code and Codex through their official CLIs using your existing logged-in credentials.
+- Spends Codex reset credits before they lapse: `limitping redeem` cashes one in by hand, and `auto_redeem = true` lets `watch` spend one on its own once it is close to expiring — a banked reset is worth nothing after it expires. Off by default, because redeeming is irreversible.
 - Optional short invocation via an `lmp` symlink (e.g. `lmp s`, `lmp w`).
-- Includes dry-run modes, weekly-limit guards, reset buffers, cheap-model
-  defaults, macOS notifications, local config, and no telemetry.
+- Includes dry-run modes, weekly-limit guards, reset buffers, cheap-model defaults, macOS notifications, local config, and no telemetry.
 
 ## Quick start
 
 Until the fork publishes its first release, build from source with Nix:
 
 ```sh
-git clone https://github.com/hnjae/limitping.git
-cd limitping
-nix build
-./result/bin/limitping config init
-./result/bin/limitping status
-./result/bin/limitping ping --dry-run
-./result/bin/limitping watch                # foreground, low-power (Ctrl-C to stop)
+nix profile add 'github:hnjae/limitping'
+limitping config init
+limitping status
+limitping ping --dry-run
+limitping watch                # foreground, low-power (Ctrl-C to stop)
 ```
 
 Use dry-run first if you want to inspect what would happen without consuming
 provider quota: `limitping ping --dry-run` or `limitping watch --dry-run`.
-
-This fork is based on upstream
-[CCLimitPing](https://github.com/wavever/CCLimitPing); fork licensing is
-documented in [LICENSE.md](LICENSE.md).
 
 ## Supported providers
 
@@ -82,42 +66,12 @@ Two cleanly separated jobs:
 | **Trigger** a new window | the official CLI (interactive Claude Code / headless `codex exec`) | a tiny slice of quota (this is the point) |
 | **Read** usage & reset times | zero-quota usage endpoints (the same ones CodexBar / community plugins use) | none — never starts a window |
 
-When `watch` sees a 5h window has reset, it sends a ping to start the next
-window. It does not inspect active Claude/Codex sessions.
+When `watch` sees a 5h window has reset, it sends a ping to start the next window. It does not inspect active Claude/Codex sessions.
 
-- **Claude**: reads `GET https://api.anthropic.com/api/oauth/usage` using the
-  OAuth token from the macOS Keychain (`Claude Code-credentials`) or
-  `~/.claude/.credentials.json`. Triggering uses a TTY-backed interactive
-  `claude "<prompt>"` session, so it continues to start the Claude
-  subscription-backed window after the headless print command moves to Agent
-  SDK/API credits. If the usage endpoint returns an ambiguous 429, limitping
-  uses the free token-counting endpoint (which does not create a Message) to
-  distinguish a real endpoint throttle from Claude Code subscription access
-  being disabled.
-- **Codex**: reads `GET https://chatgpt.com/backend-api/wham/usage` using the
-  OAuth token from `~/.codex/auth.json`. Triggering runs
-  `codex exec --ephemeral --json "<prompt>"`. `--ephemeral` is the reason the
-  ping is headless: the interactive CLI cannot skip persisting a session, so
-  every ping used to leave an "ok" conversation behind in `codex resume` and in
-  the Codex Desktop thread list. `--json` makes the ping verifiable — its
-  `turn.completed` event is the only local proof that a billable request went
-  out, and it is where the reported token count and cost come from. The ping
-  also runs with `--disable hooks` and `--sandbox read-only`: user hooks must
-  not fire for a synthetic session, and nothing reviews what the model does on
-  this path, unlike an interactive session with you at the keys.
+- **Claude**: reads `GET https://api.anthropic.com/api/oauth/usage` using the OAuth token from the macOS Keychain (`Claude Code-credentials`) or `~/.claude/.credentials.json`. Triggering uses a TTY-backed interactive `claude "<prompt>"` session, so it continues to start the Claude subscription-backed window after the headless print command moves to Agent SDK/API credits. If the usage endpoint returns an ambiguous 429, limitping uses the free token-counting endpoint (which does not create a Message) to distinguish a real endpoint throttle from Claude Code subscription access being disabled.
+- **Codex**: reads `GET https://chatgpt.com/backend-api/wham/usage` using the OAuth token from `~/.codex/auth.json`. Triggering runs `codex exec --ephemeral --json "<prompt>"`. `--ephemeral` is the reason the ping is headless: the interactive CLI cannot skip persisting a session, so every ping used to leave an "ok" conversation behind in `codex resume` and in the Codex Desktop thread list. `--json` makes the ping verifiable — its `turn.completed` event is the only local proof that a billable request went out, and it is where the reported token count and cost come from. The ping also runs with `--disable hooks` and `--sandbox read-only`: user hooks must not fire for a synthetic session, and nothing reviews what the model does on this path, unlike an interactive session with you at the keys.
 
-Claude/Codex tokens are reused from the official tools (no separate login) and
-refreshed on 401.
-
-## Example of a package installation
-
-```sh
-nix profile add 'github:hnjae/limitping'
-```
-
-```sh
-nix profile upgrade --refresh limitping
-```
+Claude/Codex tokens are reused from the official tools (no separate login) and refreshed on 401.
 
 ## Usage
 
@@ -150,10 +104,6 @@ Short aliases are also available for config commands: `limitping c i` for
 `Aliases:` line shows both binary names so either one is discoverable from the
 other.
 
-`lmp` is also recognized when invoked through a symlink named `lmp`; the Nix
-package installs `limitping` only. Build-from-source users can run
-`./result/bin/limitping` directly.
-
 | Command | Aliases |
 | --- | --- |
 | `status` | `s`, `stat` |
@@ -165,10 +115,7 @@ package installs `limitping` only. Build-from-source users can run
 | `config path` | `c p` |
 | `version` | `v`, `ver` |
 
-`ping` shows the exact command and a live timer (a spinner on a terminal). The
-Codex ping reports the turn's tokens and an equivalent API cost, read from
-`codex exec --json`; Claude's interactive trigger session exposes no reliable
-machine-readable per-ping usage, so it shows elapsed time only:
+`ping` shows the exact command and a live timer (a spinner on a terminal). The Codex ping reports the turn's tokens and an equivalent API cost, read from `codex exec --json`; Claude's interactive trigger session exposes no reliable machine-readable per-ping usage, so it shows elapsed time only:
 
 ```text
 claude  → claude --model haiku .
@@ -177,20 +124,13 @@ codex   → codex exec --ephemeral --json --skip-git-repo-check --disable hooks 
 codex   ✓ pinged (14s, 19,426 tok (in 19,414 / out 12), $0.0023)
 ```
 
-`ping` and the `watch` log always name the model. In the rare case limitping
-cannot pick one — no catalog on disk, or no recognizable budget tier in it — the
-Codex CLI chooses instead, and the model is reported alongside the command so
-you still see what the ping spent quota on:
+`ping` and the `watch` log always name the model. In the rare case limitping cannot pick one — no catalog on disk, or no recognizable budget tier in it — the Codex CLI chooses instead, and the model is reported alongside the command so you still see what the ping spent quota on:
 
 ```text
 codex   → codex exec --ephemeral --json … -c model_reasoning_effort=low ok  (model: gpt-5.6-sol)
 ```
 
-A ping ends by printing the same window view `status` gives, for the providers
-it pinged — a ping is far too small to move the used percentage, so its own
-output cannot show whether a window started. Reading usage costs nothing and
-never starts a window. `--dry-run` skips it: nothing was sent, so there is no
-new state to report.
+A ping ends by printing the same window view `status` gives, for the providers it pinged — a ping is far too small to move the used percentage, so its own output cannot show whether a window started. Reading usage costs nothing and never starts a window. `--dry-run` skips it: nothing was sent, so there is no new state to report.
 
 Example `status`:
 
@@ -208,27 +148,14 @@ codex (plus)
     - available, granted Jun 17 17:38, expires Jul 17 17:38 UTC+8 (in 24d6h)
 ```
 
-Text status defaults to **used** percentage. Set `usage_display = "remaining"` if
-you prefer the same mental model as Codex's "Usage remaining" UI.
+Text status defaults to **used** percentage. Set `usage_display = "remaining"` if you prefer the same mental model as Codex's "Usage remaining" UI.
 
 ### Today's tokens and cost
 
-The `today` line answers what the percentages cannot: how much this machine
-actually consumed since local midnight, and what that would have cost at
-published API rates — the value a subscription is returning. The usage endpoints
-only ever report percentages, so the tokens are totalled from the transcripts
-the CLIs already write to disk (`~/.claude/projects`, `~/.codex/sessions` —
-honoring `$CLAUDE_CONFIG_DIR` / `$CODEX_HOME`), the same source ccusage and
-CodexBar read, and priced with the [LiteLLM](https://github.com/BerriAI/litellm)
-dataset limitping already caches for `ping`. Nothing is uploaded: the scan is
-local, read-only, and runs alongside the usage fetch, so it costs no extra wall
+The `today` line answers what the percentages cannot: how much this machine actually consumed since local midnight, and what that would have cost at published API rates — the value a subscription is returning. The usage endpoints only ever report percentages, so the tokens are totalled from the transcripts the CLIs already write to disk (`~/.claude/projects`, `~/.codex/sessions` — honoring `$CLAUDE_CONFIG_DIR` / `$CODEX_HOME`), the same source ccusage and CodexBar read, and priced with the [LiteLLM](https://github.com/BerriAI/litellm) dataset limitping already caches for `ping`. Nothing is uploaded: the scan is local, read-only, and runs alongside the usage fetch, so it costs no extra wall
 time.
 
-Two consequences worth knowing: it is a **local** view — sessions run on another
-machine, or in the web app, leave no transcript here and are not counted — and
-the cost is an **estimate**, since a subscription does not bill per token. A
-model too new to be in the pricing dataset still has its tokens counted; it just
-adds nothing to the dollar figure (`cost_complete: false` in JSON).
+Two consequences worth knowing: it is a **local** view — sessions run on another machine, or in the web app, leave no transcript here and are not counted — and the cost is an **estimate**, since a subscription does not bill per token. A model too new to be in the pricing dataset still has its tokens counted; it just adds nothing to the dollar figure (`cost_complete: false` in JSON).
 
 `status -v` breaks the day down by bucket and by model:
 
@@ -239,32 +166,15 @@ adds nothing to the dollar figure (`cost_complete: false` in JSON).
          claude-haiku-4-5-20251001  67.4K tok  ≈ $0.09
 ```
 
-The line is omitted entirely for a provider whose CLI has never run on this
-machine — silence there is honest, where `0 tok` would claim a quiet day.
+The line is omitted entirely for a provider whose CLI has never run on this machine — silence there is honest, where `0 tok` would claim a quiet day.
 
-`status --json` returns the same data as a JSON array (one object per provider),
-for scripts and dashboards. Progress chatter is suppressed so stdout stays a
-single valid document; a provider that fails to read becomes
-`{"provider": "...", "error": "..."}` and the command exits non-zero. Add `-v`
-to embed each provider's raw response under `raw`.
+`status --json` returns the same data as a JSON array (one object per provider), for scripts and dashboards. Progress chatter is suppressed so stdout stays a single valid document; a provider that fails to read becomes `{"provider": "...", "error": "..."}` and the command exits non-zero. Add `-v` to embed each provider's raw response under `raw`.
 
-`today` is omitted for a provider with no local transcripts at all; when
-present, `cost_usd` is the API-rate estimate and `cost_complete` is false if a
-model that ran had no published rates, making that figure a lower bound.
+`today` is omitted for a provider with no local transcripts at all; when present, `cost_usd` is the API-rate estimate and `cost_complete` is false if a model that ran had no published rates, making that figure a lower bound.
 
-A window key (`five_hour` / `weekly`) is omitted when the provider does not
-currently enforce that limit — e.g. OpenAI temporarily removed Codex's 5h
-window on 2026-07-12, leaving only the weekly cap. Text mode prints
-`not currently enforced` for such a window, and `watch` schedules its ping at
-the weekly reset instead of every 5h.
+A window key (`five_hour` / `weekly`) is omitted when the provider does not currently enforce that limit — e.g. OpenAI temporarily removed Codex's 5h window on 2026-07-12, leaving only the weekly cap. Text mode prints `not currently enforced` for such a window, and `watch` schedules its ping at the weekly reset instead of every 5h.
 
-An enforced limit that nothing has started yet is a different state: text mode
-prints `(no active window)` and `resets_at` is absent from the JSON, because a
-rolling window has no reset time until a request anchors it. Codex does not
-report that state directly — it answers with a full-length window that slides
-forward on every read (`reset_after_seconds` equal to `limit_window_seconds`),
-i.e. when a window *would* end if you started one now. limitping normalizes that
-away, so a reset time is only ever shown for a window that is really running.
+An enforced limit that nothing has started yet is a different state: text mode prints `(no active window)` and `resets_at` is absent from the JSON, because a rolling window has no reset time until a request anchors it. Codex does not report that state directly — it answers with a full-length window that slides forward on every read (`reset_after_seconds` equal to `limit_window_seconds`), i.e. when a window *would* end if you started one now. limitping normalizes that away, so a reset time is only ever shown for a window that is really running.
 
 ```json
 [
@@ -346,119 +256,80 @@ align_start      = ""
 
 Top-level keys:
 
-- **`weekly_threshold`** — when the weekly window is at/above this, `watch` stops
-  pinging and waits for the weekly reset (unless usable credits exist).
-- **`reset_buffer`** — how long to wait after a window's reset time before
-  pinging, so the window has definitely rolled over.
-- **`usage_display`** — whether text `status` renders each window
-  as used percentage or remaining percentage.
-- **`align_start`** (per provider) — pin the phase of your windows: set to a
-  future RFC3339 time to delay the very first ping until then; afterwards windows
-  chain automatically every ~5h.
+- **`weekly_threshold`** — when the weekly window is at/above this, `watch` stops pinging and waits for the weekly reset (unless usable credits exist).
+- **`reset_buffer`** — how long to wait after a window's reset time before pinging, so the window has definitely rolled over.
+- **`usage_display`** — whether text `status` renders each window as used percentage or remaining percentage.
+- **`align_start`** (per provider) — pin the phase of your windows: set to a future RFC3339 time to delay the very first ping until then; afterwards windows chain automatically every ~5h.
 
 ### Why a cheap model
 
-Triggering a window doesn't depend on the model — **any** billable request starts
-the 5h clock — so the ping uses each provider's cheapest model to eat the least of
-your budget:
+Triggering a window doesn't depend on the model — **any** billable request starts the 5h clock — so the ping uses each provider's cheapest model to eat the least of your budget:
 
 - **Claude → `haiku`**: also avoids the separate weekly Opus bucket.
-- **Codex → empty, resolved per ping**: limitping reads the Codex CLI's own
-  catalog (`~/.codex/models_cache.json`) and picks the cheapest model your plan
-  offers — the budget tier OpenAI marks "Fast and affordable", never your
-  working model, which is usually a far pricier tier. Because the choice is made
-  at ping time it survives OpenAI retiring and adding models. Name a model to
-  pin one instead; a pinned model that has since been retired is rejected with
-  the current list rather than failing as an opaque server error at rollover.
+- **Codex → empty, resolved per ping**: limitping reads the Codex CLI's own catalog (`~/.codex/models_cache.json`) and picks the cheapest model your plan offers — the budget tier OpenAI marks "Fast and affordable", never your working model, which is usually a far pricier tier. Because the choice is made at ping time it survives OpenAI retiring and adding models. Name a model to pin one instead; a pinned model that has since been retired is rejected with the current list rather than failing as an opaque server error at rollover.
 
-Claude/Codex don't expose per-model prices at runtime (Anthropic's local
-cost cache is empty; Codex's model cache has no price field), so the cheapest
-model is a sensible default rather than a live price lookup. Override `model`
-per provider if you prefer.
-
-## Start `watch` at login on macOS
-
-To start `watch` at login on macOS, create a `launchd` agent at
-`~/Library/LaunchAgents/com.limitping.watch.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>com.limitping.watch</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/ABSOLUTE/PATH/TO/limitping</string>
-    <string>watch</string>
-  </array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/tmp/limitping.log</string>
-  <key>StandardErrorPath</key><string>/tmp/limitping.err</string>
-</dict>
-</plist>
-```
-
-```sh
-launchctl load ~/Library/LaunchAgents/com.limitping.watch.plist
-```
+Claude/Codex don't expose per-model prices at runtime (Anthropic's local cost cache is empty; Codex's model cache has no price field), so the cheapest model is a sensible default rather than a live price lookup. Override `model` per provider if you prefer.
 
 ## Cost & caveats
 
-- See [PRIVACY.md](PRIVACY.md) for local data handling and network behavior.
-- See [SECURITY.md](SECURITY.md) for vulnerability reporting and credential
-  handling notes.
-- Triggering **consumes a little quota** (~one ping per 5h ≈ 33/week). The ping
-  uses a minimal prompt and low reasoning, so the cost is tiny but non-zero.
-- The **usage endpoints are unofficial** and could change; they're read-only and
-  isolated per provider for easy patching.
-- macOS-first: Keychain reads and notifications are macOS-only. Codex
-  `auth.json` is cross-platform; Claude on Linux uses
-  `~/.claude/.credentials.json`; notifications are a no-op off macOS.
+- Triggering **consumes a little quota** (~one ping per 5h ≈ 33/week). The ping uses a minimal prompt and low reasoning, so the cost is tiny but non-zero.
+- The **usage endpoints are unofficial** and could change; they're read-only and isolated per provider for easy patching.
+- macOS-first: Keychain reads and notifications are macOS-only. Codex `auth.json` is cross-platform; Claude on Linux uses `~/.claude/.credentials.json`; notifications are a no-op off macOS.
 
-## Layout
+### Privacy
 
-```text
-cmd/limitping            CLI entry
-internal/config          TOML config
-internal/usage           normalized usage model
-internal/auth            Claude (Keychain) + Codex (auth.json) tokens
-internal/provider        per-provider ReadUsage (endpoint) + Trigger (CLI)
-internal/pricing         pricing helpers for providers that expose token usage
-internal/spend           today's tokens/cost, read from the CLIs' local session transcripts
-internal/scheduler       the watch engine (sleep-until-reset, weekly-respect, backoff)
-internal/notify          macOS osascript notifications
-internal/cli             cobra commands: status, ping, watch, redeem, config, version
-```
+`limitping` is a local command-line tool. It does not include analytics, telemetry, crash reporting, or advertising trackers.
 
-## Contributing
+#### Data Processed Locally
 
-Issues and PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and
-[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Before submitting:
+Depending on the providers you enable, `limitping` may read:
 
-```sh
-nix flake check
-```
+- Claude Code OAuth credentials from the macOS Keychain or `~/.claude/.credentials.json`
+- Codex OAuth credentials from `~/.codex/auth.json` or `$CODEX_HOME/auth.json`
+- Your `limitping` configuration from `~/.config/limitping/config.toml`
+- Provider usage responses used to calculate reset times
+- Claude Code / Codex session transcripts (`~/.claude/projects`, `~/.codex/sessions`, honoring `$CLAUDE_CONFIG_DIR` / `$CODEX_HOME`) when `status` totals the day's token usage. Only the token-count and model fields of today's records are read; prompts and responses are not parsed, and nothing from these files leaves the machine
 
-Providers are isolated in `internal/provider` behind a small `Provider`
-interface (`ReadUsage` + `Trigger`), so adding a new provider is mostly
-self-contained provider code plus wiring in `internal/cli` and `internal/config`.
+The tool may write:
 
-**Releasing** is one command — push a tag, and GitHub Actions runs GoReleaser to
-build the cross-platform binaries and publish a Release:
+- `~/.config/limitping/config.toml` when you run `limitping config init`
+- `~/.config/limitping/litellm_prices.json`, a cached copy of the LiteLLM pricing dataset used for ping and daily cost estimates
+- Rotated Claude/Codex OAuth tokens back to the same credential stores used by the official CLIs, when a refresh is required
 
-```sh
-git tag v0.10.0 && git push origin v0.10.0
-```
+#### Network Requests
 
-Nothing else needs editing. The tag is the only place a version is written down:
-the release build stamps it in via `-ldflags`, and any other build derives its
-version from the module's build info, so there is no constant to bump and
-nothing that can drift from the tag. A local `go build` reports
-`dev+<revision>`.
+`limitping` makes network requests only to support the command you run:
 
-Release notes are generated from the commit log, so **commit subjects are the
-release notes** — write them as a line a user would want to read. There is no
-hand-maintained changelog to keep in sync; published notes live on the
-[fork's Releases](https://github.com/hnjae/limitping/releases) page.
+- Anthropic Claude Code OAuth and usage endpoints
+- ChatGPT/Codex OAuth and usage endpoints
+- The LiteLLM pricing dataset on GitHub, for equivalent API-cost estimates
+  (per ping and per day)
+
+The tool does not send provider credentials to unrelated services.
+
+#### User-Visible Sensitive Output
+
+`limitping status -v` prints raw provider usage responses. Treat this output as account metadata and avoid posting it publicly.
+
+`ping --dry-run` and `watch --dry-run` print planned commands without sending provider requests.
+
+#### Data Retention
+
+`limitping` does not maintain a usage history database. Provider usage data is read for the current command and discarded, except for normal terminal output or logs you choose to keep.
+
+#### User Controls
+
+- Disable a provider in `~/.config/limitping/config.toml`
+- Delete `~/.config/limitping/litellm_prices.json` to remove the pricing cache
+- Run `watch --dry-run` to verify scheduling behavior without sending pings
+
+### Security Policy
+
+#### Credential Handling Notes
+
+`limitping` reuses credentials from official provider tools where possible:
+
+- Claude Code OAuth credentials from the macOS Keychain or
+  `~/.claude/.credentials.json`
+- Codex OAuth credentials from `~/.codex/auth.json` or
+  `$CODEX_HOME/auth.json`
