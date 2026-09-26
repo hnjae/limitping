@@ -13,3 +13,13 @@ SPDX-FileCopyrightText = [
   "2026 KIM Hyunjae",
 ]
 SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+[[annotations]]
+path = [
+  "**/flake.lock",
+  ".editorconfig",
+]
+SPDX-FileCopyrightText = [
+  "2026 KIM Hyunjae",
+]
+SPDX-License-Identifier = "AGPL-3.0-or-later"

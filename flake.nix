@@ -57,6 +57,7 @@
               detect-private-keys.enable = true;
               treefmt.enable = true;
               typos.enable = true;
+              reuse.enable = true;
             };
 
             devShells.default = pkgs.mkShellNoCC {
